@@ -4,7 +4,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { toHttpError } = require("./errors");
 const { LlmBusyError, LlmError } = require("./llm");
-const { InvalidTopicError, TopicNotSupportedError } = require("./packs/generate");
+const { InvalidTopicError, TopicNotSupportedError, GenerationUnavailableError } = require("./packs/generate");
 
 test("a busy queue becomes 503 with error busy", () => {
   const { status, body } = toHttpError(new LlmBusyError());
@@ -23,6 +23,12 @@ test("an unsupported topic becomes 422 with error topic_not_supported", () => {
   const { status, body } = toHttpError(new TopicNotSupportedError());
   assert.equal(status, 422);
   assert.equal(body.error, "topic_not_supported");
+});
+
+test("an unreachable model becomes 503 with error generation_unavailable", () => {
+  const { status, body } = toHttpError(new GenerationUnavailableError());
+  assert.equal(status, 503);
+  assert.equal(body.error, "generation_unavailable");
 });
 
 test("an LLM failure is reported as a generic server error", () => {

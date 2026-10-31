@@ -88,15 +88,21 @@ Questions with `answerKey: null` and `kind: "mcq"` are self-report items: they p
 ### Generated packs
 
 `server/packs/generate.js` turns a topic the app has no curated pack for into a draft:
-concepts (8–14, graph validated), then 5 diagnostic + 6 check questions, then a
-self-consistency pass in which every mcq is re-answered by the model without the key and
-dropped if the answers disagree. A pack that cannot clear those gates raises
-`topic_not_supported` (HTTP 422) instead of serving something weak. Drafts are stored in
-the `packs` collection and cached by normalized topic, so the same topic is never drafted
+concepts (8–14, graph validated), then 8 diagnostic + 8 check questions (at least 2/3/3
+across difficulty 1/2/3 per list, one free-text each), then a self-consistency pass in
+which every mcq is re-answered by the model without the key and dropped if the answers
+disagree. Options are shuffled in code before that check, so the order the model happened
+to write cannot pass it. What survives is kept: a pack needs 3 questions per list with one
+per difficulty, and is retried once as a whole before `topic_not_supported` (HTTP 422) is
+raised. An unreachable model is not an unsupported topic: it raises
+`generation_unavailable` (HTTP 503) and no pack is invented. Drafts are stored in the
+`packs` collection and cached by normalized topic, so the same topic is never drafted
 twice.
 
 Prompts live in the `prompts` export of that file. All of them wrap user-supplied text in
-tags and tell the model it is data, never instructions.
+tags, defuse closing tags inside it, and tell the model it is data, never instructions.
+With source text the model is told to use only that text as its factual basis; with none,
+to use general knowledge and never invent a citation or URL.
 
 ## Status
 

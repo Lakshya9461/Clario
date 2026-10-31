@@ -46,7 +46,7 @@ test("always invalid falls back after two attempts and is degraded", async () =>
   const { fn, calls } = fakeChat([JSON.stringify({ alpha: 1 })]);
   const result = await chatJson([{ role: "user", content: "hi" }], schema, fallback, { chat: fn });
 
-  assert.deepEqual(result, { value: fallback, degraded: true });
+  assert.deepEqual(result, { value: fallback, degraded: true, reason: "invalid" });
   assert.equal(calls.length, 2);
 });
 
@@ -54,16 +54,16 @@ test("a reply that is not JSON falls back and is degraded", async () => {
   const { fn, calls } = fakeChat(["Sure! Here is your JSON: {alpha: 'x'}"]);
   const result = await chatJson([{ role: "user", content: "hi" }], schema, fallback, { chat: fn });
 
-  assert.deepEqual(result, { value: fallback, degraded: true });
+  assert.deepEqual(result, { value: fallback, degraded: true, reason: "invalid" });
   assert.equal(calls.length, 2);
   assert.match(calls[1].messages.at(-1).content, /was not valid JSON/);
 });
 
-test("a transport failure falls back immediately without a second attempt", async () => {
+test("a transport failure falls back immediately and reports why", async () => {
   const { fn, calls } = fakeChat([new LlmError("LLM returned HTTP 500: boom")]);
   const result = await chatJson([{ role: "user", content: "hi" }], schema, fallback, { chat: fn });
 
-  assert.deepEqual(result, { value: fallback, degraded: true });
+  assert.deepEqual(result, { value: fallback, degraded: true, reason: "unavailable" });
   assert.equal(calls.length, 1);
 });
 

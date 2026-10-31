@@ -121,6 +121,9 @@ async function chat(messages, options = {}) {
 // Ask for JSON and validate it. Exactly one retry, then the fallback plus degraded: true.
 // Network/timeout failures fall back immediately: a second 90s wait helps nobody.
 // A busy queue is NOT degraded: it is thrown so the route can answer 503 { error: "busy" }.
+//
+// `reason` says why a fallback happened, because "the model could not be reached" and "the
+// model replied nonsense" deserve different answers: "unavailable" or "invalid".
 async function chatJson(messages, schema, fallback, options = {}) {
   const call = options.chat || chat;
   const chatOptions = { json: true, timeoutMs: options.timeoutMs, fetch: options.fetch };
@@ -136,7 +139,7 @@ async function chatJson(messages, schema, fallback, options = {}) {
       content = await call(attemptMessages, chatOptions);
     } catch (error) {
       if (error instanceof LlmBusyError) throw error;
-      return { value: fallback, degraded: true };
+      return { value: fallback, degraded: true, reason: "unavailable" };
     }
 
     lastContent = content;
@@ -156,7 +159,7 @@ async function chatJson(messages, schema, fallback, options = {}) {
       .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);
   }
 
-  return { value: fallback, degraded: true };
+  return { value: fallback, degraded: true, reason: "invalid" };
 }
 
 function retryMessages(lastContent, issues) {
