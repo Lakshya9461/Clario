@@ -1,0 +1,679 @@
+{
+  "topic": "python-recursion",
+  "version": "0.1-beta",
+  "notes": [
+    "All predict_output answer keys and traces were produced by running the code, not typed by hand. Re-run build_questions.py if you change any code sample.",
+    "Check rules: serve 3 questions, one per tier (1, 2, 3). Pick one from each tier at random, never reuse a question the session has already seen. Tier 3 is the transfer question. At least one question must have requiresWhy = true (tier 2).",
+    "commonWrongAnswers, optionHints and whyRubric are PROVISIONAL misconception hints for the LLM prompt. They are not a validated catalogue; have someone who teaches CS review them.",
+    "phase 'diagnostic' questions are asked in order d1, d2, then d3 only if d2 is wrong, then d4, d5, capped at 5 or earlier if the student skips."
+  ],
+  "diagnostic": [
+    {
+      "id": "d1",
+      "kind": "mcq",
+      "phase": "diagnostic",
+      "selfReport": true,
+      "prompt": "How comfortable are you with Python functions?",
+      "options": [
+        "I haven't written one yet",
+        "I can write simple ones that take a value and return a result",
+        "I can write functions that call other functions"
+      ],
+      "conceptIds": [
+        "functions",
+        "parameters",
+        "return_values"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": null,
+      "evidenceRule": "Record a self_report event on 'functions' (outcome 'correct' for options 2-3, 'unsure' for option 1). Never treated as demonstrated.",
+      "fallbackFeedback": {
+        "correct": "Thanks. Let's check with a short example.",
+        "incorrect": "That's fine. We'll go step by step."
+      }
+    },
+    {
+      "id": "d2",
+      "kind": "predict_output",
+      "prompt": "What will this program print? Explain your reasoning, even if you're unsure.",
+      "code": "def count(n):\n    if n == 0:\n        return\n\n    print(n)\n    count(n - 1)\n\ncount(3)",
+      "conceptIds": [
+        "recursive_call",
+        "call_flow",
+        "tracing_recursion"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "3",
+          "2",
+          "1"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "phase": "diagnostic",
+      "traceId": "count3",
+      "commonWrongAnswers": [
+        {
+          "tokens": [
+            "3"
+          ],
+          "hint": "May think the function runs only once, or that the call to itself does not run again."
+        },
+        {
+          "tokens": [
+            "3",
+            "2",
+            "1",
+            "0"
+          ],
+          "hint": "May think the base case prints, or be unsure when n == 0 stops the printing."
+        }
+      ],
+      "followUpIfWrong": {
+        "questionId": "d3"
+      },
+      "fallbackFeedback": {
+        "correct": "Right: 3, 2, 1. Each call prints its own n, then calls count with a smaller value.",
+        "incorrect": "Not quite. Let's look at what happens when count(3) reaches the line count(n - 1)."
+      }
+    },
+    {
+      "id": "d3",
+      "kind": "mcq",
+      "phase": "diagnostic",
+      "prompt": "In the program above, when count(3) reaches the line count(n - 1), what value is passed to the next call?",
+      "code": "def count(n):\n    if n == 0:\n        return\n\n    print(n)\n    count(n - 1)\n\ncount(3)",
+      "options": [
+        "2",
+        "3",
+        "0",
+        "n (unchanged, so the same call repeats)"
+      ],
+      "conceptIds": [
+        "parameters",
+        "recursive_step"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "2",
+        "gradingNote": "Graded by CODE."
+      },
+      "optionHints": {
+        "3": "May think n does not change between calls.",
+        "0": "May think the next call jumps straight to the base case.",
+        "n (unchanged, so the same call repeats)": "May think each call shares one n instead of having its own."
+      },
+      "fallbackFeedback": {
+        "correct": "Yes: n - 1 is 2, so the next call is count(2) with its own n.",
+        "incorrect": "n - 1 with n = 3 is 2, so the next call is count(2). Each call has its own n."
+      }
+    },
+    {
+      "id": "d4",
+      "kind": "predict_output",
+      "prompt": "What will this program print?",
+      "code": "def show(n):\n    if n == 0:\n        return\n    show(n - 1)\n    print(n)\n\nshow(3)",
+      "conceptIds": [
+        "call_stack",
+        "tracing_recursion",
+        "recursive_return"
+      ],
+      "difficulty": 3,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "1",
+          "2",
+          "3"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "phase": "diagnostic",
+      "traceId": "show3",
+      "commonWrongAnswers": [
+        {
+          "tokens": [
+            "3",
+            "2",
+            "1"
+          ],
+          "hint": "May think print runs before the recursive call, or does not see that print waits until the deeper calls return."
+        }
+      ],
+      "fallbackFeedback": {
+        "correct": "Yes: 1, 2, 3. The prints happen as the calls come back, last call first.",
+        "incorrect": "The print comes AFTER show(n - 1), so it waits until the deeper calls have finished. Step through the trace to see the order."
+      }
+    },
+    {
+      "id": "d5",
+      "kind": "mcq",
+      "phase": "diagnostic",
+      "prompt": "Suppose the count function had no `if n == 0: return` check. What would happen when you run count(3)?",
+      "code": "def count(n):\n    print(n)\n    count(n - 1)\n\ncount(3)",
+      "options": [
+        "It prints 3, 2, 1 and stops normally",
+        "It prints 3 and stops",
+        "It keeps calling itself with 0, -1, -2, ... until Python raises a RecursionError",
+        "It returns None without printing"
+      ],
+      "conceptIds": [
+        "base_case"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "It keeps calling itself with 0, -1, -2, ... until Python raises a RecursionError",
+        "gradingNote": "Graded by CODE."
+      },
+      "optionHints": {
+        "It prints 3, 2, 1 and stops normally": "May think the function stops by itself when n reaches 0.",
+        "It prints 3 and stops": "May think the function runs only once.",
+        "It returns None without printing": "Unclear on what a missing stop condition does."
+      },
+      "fallbackFeedback": {
+        "correct": "Right. Without a base case nothing ever stops the calls.",
+        "incorrect": "Nothing tells the function to stop at 0, so it keeps going: 0, -1, -2 ... until Python raises a RecursionError."
+      }
+    }
+  ],
+  "check": [
+    {
+      "id": "c1a",
+      "kind": "predict_output",
+      "prompt": "What will this program print?",
+      "code": "def countdown(n):\n    if n <= 0:\n        return\n    print(n)\n    countdown(n - 2)\n\ncountdown(5)",
+      "conceptIds": [
+        "recursive_step",
+        "tracing_recursion"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "5",
+          "3",
+          "1"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "fallbackFeedback": {
+        "correct": "Correct: 5, 3, 1.",
+        "incorrect": "Each call passes n - 2, so n goes 5, 3, 1. At 1 the next value is -1, which is <= 0, so it stops."
+      },
+      "phase": "check",
+      "tier": 1
+    },
+    {
+      "id": "c1b",
+      "kind": "predict_output",
+      "prompt": "What will this program print?",
+      "code": "def up(n):\n    if n > 3:\n        return\n    print(n)\n    up(n + 1)\n\nup(1)",
+      "conceptIds": [
+        "base_case",
+        "tracing_recursion"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "1",
+          "2",
+          "3"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "fallbackFeedback": {
+        "correct": "Correct: 1, 2, 3.",
+        "incorrect": "n counts up 1, 2, 3 and stops when n > 3."
+      },
+      "phase": "check",
+      "tier": 1
+    },
+    {
+      "id": "c2a",
+      "kind": "predict_output",
+      "prompt": "What will this program print? Then, in one or two sentences, explain what factorial(2) hands back to factorial(3).",
+      "code": "def factorial(n):\n    if n == 1:\n        return 1\n    return n * factorial(n - 1)\n\nprint(factorial(4))",
+      "conceptIds": [
+        "recursive_return",
+        "call_stack"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "24"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "whyRubric": "Full credit if the answer says factorial(2) returns 2 and that factorial(3) uses/multiplies that returned value (n * result = 3 * 2 = 6). Partial if it gets the number but not that the value is passed back to the caller. Judged by LLM; the number itself is graded by CODE.",
+      "fallbackFeedback": {
+        "correct": "Correct: 24.",
+        "incorrect": "factorial(4) = 4 * factorial(3) = 4 * 6 = 24. Each call waits for the value returned by the call below it."
+      },
+      "phase": "check",
+      "tier": 2
+    },
+    {
+      "id": "c2b",
+      "kind": "predict_output",
+      "prompt": "What will this program print? Then explain in one or two sentences why total(0) must return 0.",
+      "code": "def total(n):\n    if n == 0:\n        return 0\n    return n + total(n - 1)\n\nprint(total(4))",
+      "conceptIds": [
+        "base_case",
+        "recursive_return"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "10"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "whyRubric": "Full credit if the answer says total(0) is the stopping point and its 0 is what the call above adds to (1 + 0), so the chain can finish. Partial if it only says 'it stops'. Judged by LLM; the number itself is graded by CODE.",
+      "fallbackFeedback": {
+        "correct": "Correct: 10.",
+        "incorrect": "4 + 3 + 2 + 1 + total(0), and total(0) returns 0, so the answer is 10."
+      },
+      "phase": "check",
+      "tier": 2
+    },
+    {
+      "id": "c3a",
+      "kind": "predict_output",
+      "prompt": "A new kind of data: what will this program print?",
+      "code": "def length(s):\n    if s == \"\":\n        return 0\n    return 1 + length(s[1:])\n\nprint(length(\"code\"))",
+      "conceptIds": [
+        "recursive_return",
+        "base_case",
+        "tracing_recursion"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "4"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "fallbackFeedback": {
+        "correct": "Correct: 4. Each call peels off one character and adds 1.",
+        "incorrect": "Each call returns 1 + the length of the rest of the string; the empty string returns 0, so \"code\" gives 4."
+      },
+      "phase": "check",
+      "tier": 3
+    },
+    {
+      "id": "c3b",
+      "kind": "predict_output",
+      "prompt": "A new kind of data: what will this program print?",
+      "code": "def rev(s):\n    if len(s) <= 1:\n        return s\n    return rev(s[1:]) + s[0]\n\nprint(rev(\"abc\"))",
+      "conceptIds": [
+        "recursive_return",
+        "tracing_recursion"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "tokens",
+        "value": [
+          "cba"
+        ],
+        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+      },
+      "fallbackFeedback": {
+        "correct": "Correct: cba.",
+        "incorrect": "rev(\"abc\") = rev(\"bc\") + \"a\" = (rev(\"c\") + \"b\") + \"a\" = \"cba\"."
+      },
+      "phase": "check",
+      "tier": 3
+    }
+  ],
+  "traces": {
+    "count3": {
+      "code": "def count(n):\n    if n == 0:\n        return\n\n    print(n)\n    count(n - 1)\n\ncount(3)",
+      "steps": [
+        {
+          "stack": [
+            "count(3)"
+          ],
+          "output": [],
+          "note": "Call count(3)"
+        },
+        {
+          "stack": [
+            "count(3)"
+          ],
+          "output": [
+            "3"
+          ],
+          "note": "print(3) -> output: 3"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)"
+          ],
+          "output": [
+            "3"
+          ],
+          "note": "Call count(2)"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)"
+          ],
+          "output": [
+            "3",
+            "2"
+          ],
+          "note": "print(2) -> output: 2"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)",
+            "count(1)"
+          ],
+          "output": [
+            "3",
+            "2"
+          ],
+          "note": "Call count(1)"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)",
+            "count(1)"
+          ],
+          "output": [
+            "3",
+            "2",
+            "1"
+          ],
+          "note": "print(1) -> output: 1"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)",
+            "count(1)",
+            "count(0)"
+          ],
+          "output": [
+            "3",
+            "2",
+            "1"
+          ],
+          "note": "Call count(0)"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)",
+            "count(1)",
+            "count(0)"
+          ],
+          "output": [
+            "3",
+            "2",
+            "1"
+          ],
+          "note": "count(0) finishes; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)",
+            "count(1)"
+          ],
+          "output": [
+            "3",
+            "2",
+            "1"
+          ],
+          "note": "count(1) finishes; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "count(3)",
+            "count(2)"
+          ],
+          "output": [
+            "3",
+            "2",
+            "1"
+          ],
+          "note": "count(2) finishes; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "count(3)"
+          ],
+          "output": [
+            "3",
+            "2",
+            "1"
+          ],
+          "note": "count(3) finishes; control goes back to its caller"
+        }
+      ],
+      "finalOutput": [
+        "3",
+        "2",
+        "1"
+      ]
+    },
+    "show3": {
+      "code": "def show(n):\n    if n == 0:\n        return\n    show(n - 1)\n    print(n)\n\nshow(3)",
+      "steps": [
+        {
+          "stack": [
+            "show(3)"
+          ],
+          "output": [],
+          "note": "Call show(3)"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)"
+          ],
+          "output": [],
+          "note": "Call show(2)"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)",
+            "show(1)"
+          ],
+          "output": [],
+          "note": "Call show(1)"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)",
+            "show(1)",
+            "show(0)"
+          ],
+          "output": [],
+          "note": "Call show(0)"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)",
+            "show(1)",
+            "show(0)"
+          ],
+          "output": [],
+          "note": "show(0) finishes; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)",
+            "show(1)"
+          ],
+          "output": [
+            "1"
+          ],
+          "note": "print(1) -> output: 1"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)",
+            "show(1)"
+          ],
+          "output": [
+            "1"
+          ],
+          "note": "show(1) finishes; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)"
+          ],
+          "output": [
+            "1",
+            "2"
+          ],
+          "note": "print(2) -> output: 2"
+        },
+        {
+          "stack": [
+            "show(3)",
+            "show(2)"
+          ],
+          "output": [
+            "1",
+            "2"
+          ],
+          "note": "show(2) finishes; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "show(3)"
+          ],
+          "output": [
+            "1",
+            "2",
+            "3"
+          ],
+          "note": "print(3) -> output: 3"
+        },
+        {
+          "stack": [
+            "show(3)"
+          ],
+          "output": [
+            "1",
+            "2",
+            "3"
+          ],
+          "note": "show(3) finishes; control goes back to its caller"
+        }
+      ],
+      "finalOutput": [
+        "1",
+        "2",
+        "3"
+      ]
+    },
+    "factorial3": {
+      "code": "def factorial(n):\n    if n == 1:\n        return 1\n    return n * factorial(n - 1)\n\nprint(factorial(3))",
+      "steps": [
+        {
+          "stack": [
+            "factorial(3)"
+          ],
+          "output": [],
+          "note": "Call factorial(3)"
+        },
+        {
+          "stack": [
+            "factorial(3)",
+            "factorial(2)"
+          ],
+          "output": [],
+          "note": "Call factorial(2)"
+        },
+        {
+          "stack": [
+            "factorial(3)",
+            "factorial(2)",
+            "factorial(1)"
+          ],
+          "output": [],
+          "note": "Call factorial(1)"
+        },
+        {
+          "stack": [
+            "factorial(3)",
+            "factorial(2)",
+            "factorial(1)"
+          ],
+          "output": [],
+          "note": "factorial(1) finishes and returns 1; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "factorial(3)",
+            "factorial(2)"
+          ],
+          "output": [],
+          "note": "factorial(2) finishes and returns 2; control goes back to its caller"
+        },
+        {
+          "stack": [
+            "factorial(3)"
+          ],
+          "output": [],
+          "note": "factorial(3) finishes and returns 6; control goes back to its caller"
+        },
+        {
+          "stack": [],
+          "output": [
+            "6"
+          ],
+          "note": "print(6) -> output: 6"
+        }
+      ],
+      "finalOutput": [
+        "6"
+      ]
+    }
+  }
+}
