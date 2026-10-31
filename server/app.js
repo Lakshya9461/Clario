@@ -3,6 +3,7 @@
 
 const express = require("express");
 const cors = require("cors");
+const { toHttpError } = require("./errors");
 
 const app = express();
 
@@ -20,14 +21,11 @@ app.use((req, res) => {
   });
 });
 
-// Contract: every error is { error, message }. Internal details are not leaked.
+// Contract: every error is { error, message }. toHttpError decides what may be shown.
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
-  const status = error.status || error.statusCode || 500;
-  res.status(status).json({
-    error: status === 400 ? "bad_request" : "server_error",
-    message: status >= 500 ? "Something went wrong." : error.message,
-  });
+  const { status, body } = toHttpError(error);
+  res.status(status).json(body);
 });
 
 module.exports = app;

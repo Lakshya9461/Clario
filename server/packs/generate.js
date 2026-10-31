@@ -27,6 +27,7 @@ class TopicNotSupportedError extends Error {
     this.name = "TopicNotSupportedError";
     this.status = 422;
     this.code = "topic_not_supported";
+    this.expose = true;
   }
 }
 
@@ -36,6 +37,7 @@ class InvalidTopicError extends Error {
     this.name = "InvalidTopicError";
     this.status = 400;
     this.code = "invalid_topic";
+    this.expose = true;
   }
 }
 

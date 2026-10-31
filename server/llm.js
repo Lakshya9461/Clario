@@ -17,6 +17,7 @@ class LlmBusyError extends Error {
     this.name = "LlmBusyError";
     this.status = 503;
     this.code = "busy";
+    this.expose = true; // the route answers 503 { error: "busy" }
   }
 }
 
