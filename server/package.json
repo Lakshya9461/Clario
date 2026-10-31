@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch index.js",
     "start": "node index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "smoke": "node scripts/llm-smoke.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

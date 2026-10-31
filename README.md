@@ -46,8 +46,12 @@ curl -s http://127.0.0.1:3000/health
 ## Test
 
 ```bash
-cd server && npm test        # node --test: pack validator + sample pack
+cd server && npm test        # node --test: packs, validator, generation, llm, estimates
+cd server && npm run smoke   # one text + one JSON request against the local Strata server
 ```
+
+`npm run smoke` prints the base URL, whether the model and key are configured, and the
+timing and validity of each reply. It fails loudly if Strata is down or replying badly.
 
 ## Packs
 
@@ -81,7 +85,21 @@ question's `conceptIds` exist, every `mcq` answer key is one of its own options,
 Questions with `answerKey: null` and `kind: "mcq"` are self-report items: they produce
 `self_report` evidence and are never counted as demonstrated.
 
+### Generated packs
+
+`server/packs/generate.js` turns a topic the app has no curated pack for into a draft:
+concepts (8–14, graph validated), then 5 diagnostic + 6 check questions, then a
+self-consistency pass in which every mcq is re-answered by the model without the key and
+dropped if the answers disagree. A pack that cannot clear those gates raises
+`topic_not_supported` (HTTP 422) instead of serving something weak. Drafts are stored in
+the `packs` collection and cached by normalized topic, so the same topic is never drafted
+twice.
+
+Prompts live in the `prompts` export of that file. All of them wrap user-supplied text in
+tags and tell the model it is data, never instructions.
+
 ## Status
 
-Phase 0 (repo + pack layout): `GET /health`, pack loader/validator and tests exist. No
-sessions, LLM calls, evidence or UI features yet.
+Phase 0 (repo + pack layout), Phase 1 (LLM client) and Phase 2 (draft pack generation).
+There are no HTTP routes beyond `GET /health` yet, so nothing calls the generator from the
+API.
