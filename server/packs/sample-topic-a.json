@@ -1,18 +1,132 @@
 {
+  "packId": "sample-topic-a",
   "topic": "python-recursion",
+  "status": "curated",
   "version": "0.1-beta",
-  "notes": [
-    "All predict_output answer keys and traces were produced by running the code, not typed by hand. Re-run build_questions.py if you change any code sample.",
-    "Check rules: serve 3 questions, one per tier (1, 2, 3). Pick one from each tier at random, never reuse a question the session has already seen. Tier 3 is the transfer question. At least one question must have requiresWhy = true (tier 2).",
-    "commonWrongAnswers, optionHints and whyRubric are PROVISIONAL misconception hints for the LLM prompt. They are not a validated catalogue; have someone who teaches CS review them.",
-    "phase 'diagnostic' questions are asked in order d1, d2, then d3 only if d2 is wrong, then d4, d5, capped at 5 or earlier if the student skips."
+  "concepts": [
+    {
+      "id": "variables",
+      "name": "Variables and values",
+      "description": "A name refers to a value; assignment changes what a name refers to.",
+      "prerequisites": []
+    },
+    {
+      "id": "expressions",
+      "name": "Evaluating expressions",
+      "description": "Arithmetic and comparison expressions such as n - 1 and n == 0 produce values.",
+      "prerequisites": [
+        "variables"
+      ]
+    },
+    {
+      "id": "conditionals",
+      "name": "Conditionals",
+      "description": "if statements choose which code runs based on a boolean expression.",
+      "prerequisites": [
+        "expressions"
+      ]
+    },
+    {
+      "id": "functions",
+      "name": "Defining and calling functions",
+      "description": "A function is defined once and can be called many times.",
+      "prerequisites": [
+        "variables"
+      ]
+    },
+    {
+      "id": "parameters",
+      "name": "Parameters and arguments",
+      "description": "A call passes argument values into the function's parameters; each call gets its own parameter values.",
+      "prerequisites": [
+        "functions",
+        "expressions"
+      ]
+    },
+    {
+      "id": "return_values",
+      "name": "Return values",
+      "description": "return ends the call and hands a value back to the caller.",
+      "prerequisites": [
+        "functions"
+      ]
+    },
+    {
+      "id": "call_flow",
+      "name": "Execution flow of calls",
+      "description": "When a function is called, execution moves into it, then resumes after the call when it returns.",
+      "prerequisites": [
+        "parameters",
+        "return_values",
+        "conditionals"
+      ]
+    },
+    {
+      "id": "call_stack",
+      "name": "The call stack",
+      "description": "Active calls are kept in a stack; the most recent call finishes first.",
+      "prerequisites": [
+        "call_flow"
+      ]
+    },
+    {
+      "id": "recursive_call",
+      "name": "A function calling itself",
+      "description": "A recursive call is an ordinary call whose target happens to be the same function, with its own parameter values.",
+      "prerequisites": [
+        "call_stack"
+      ]
+    },
+    {
+      "id": "base_case",
+      "name": "Base case",
+      "description": "The condition under which the function stops calling itself.",
+      "prerequisites": [
+        "recursive_call",
+        "conditionals"
+      ]
+    },
+    {
+      "id": "recursive_step",
+      "name": "Recursive step and progress",
+      "description": "Each recursive call must move the arguments closer to the base case.",
+      "prerequisites": [
+        "recursive_call",
+        "parameters"
+      ]
+    },
+    {
+      "id": "tracing_recursion",
+      "name": "Tracing recursive execution",
+      "description": "Predict output and order of calls and returns for a recursive function.",
+      "prerequisites": [
+        "base_case",
+        "recursive_step"
+      ]
+    },
+    {
+      "id": "recursive_return",
+      "name": "Returning values through recursive calls",
+      "description": "A recursive call's returned value is used by the caller, for example n * factorial(n - 1).",
+      "prerequisites": [
+        "tracing_recursion",
+        "return_values"
+      ]
+    },
+    {
+      "id": "writing_recursive",
+      "name": "Writing a simple recursive function",
+      "description": "Identify the base case and recursive step for a small problem and write the function.",
+      "prerequisites": [
+        "recursive_return"
+      ]
+    }
   ],
+  "learningObjective": "Understand recursive execution and write simple recursive functions.",
   "diagnostic": [
     {
       "id": "d1",
       "kind": "mcq",
-      "phase": "diagnostic",
-      "selfReport": true,
       "prompt": "How comfortable are you with Python functions?",
       "options": [
         "I haven't written one yet",
@@ -28,11 +142,11 @@
       "transfer": false,
       "requiresWhy": false,
       "answerKey": null,
-      "evidenceRule": "Record a self_report event on 'functions' (outcome 'correct' for options 2-3, 'unsure' for option 1). Never treated as demonstrated.",
       "fallbackFeedback": {
         "correct": "Thanks. Let's check with a short example.",
         "incorrect": "That's fine. We'll go step by step."
-      }
+      },
+      "evidenceRule": "Record a self_report event on 'functions' (outcome 'correct' for options 2-3, 'unsure' for option 1). Never treated as demonstrated."
     },
     {
       "id": "d2",
@@ -53,10 +167,13 @@
           "3",
           "2",
           "1"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
-      "phase": "diagnostic",
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
+      "fallbackFeedback": {
+        "correct": "Right: 3, 2, 1. Each call prints its own n, then calls count with a smaller value.",
+        "incorrect": "Not quite. Let's look at what happens when count(3) reaches the line count(n - 1)."
+      },
       "traceId": "count3",
       "commonWrongAnswers": [
         {
@@ -77,16 +194,11 @@
       ],
       "followUpIfWrong": {
         "questionId": "d3"
-      },
-      "fallbackFeedback": {
-        "correct": "Right: 3, 2, 1. Each call prints its own n, then calls count with a smaller value.",
-        "incorrect": "Not quite. Let's look at what happens when count(3) reaches the line count(n - 1)."
       }
     },
     {
       "id": "d3",
       "kind": "mcq",
-      "phase": "diagnostic",
       "prompt": "In the program above, when count(3) reaches the line count(n - 1), what value is passed to the next call?",
       "code": "def count(n):\n    if n == 0:\n        return\n\n    print(n)\n    count(n - 1)\n\ncount(3)",
       "options": [
@@ -104,17 +216,17 @@
       "requiresWhy": false,
       "answerKey": {
         "type": "option",
-        "value": "2",
-        "gradingNote": "Graded by CODE."
+        "value": "2"
       },
-      "optionHints": {
-        "3": "May think n does not change between calls.",
-        "0": "May think the next call jumps straight to the base case.",
-        "n (unchanged, so the same call repeats)": "May think each call shares one n instead of having its own."
-      },
+      "gradingNote": "Graded by CODE.",
       "fallbackFeedback": {
         "correct": "Yes: n - 1 is 2, so the next call is count(2) with its own n.",
         "incorrect": "n - 1 with n = 3 is 2, so the next call is count(2). Each call has its own n."
+      },
+      "optionHints": {
+        "0": "May think the next call jumps straight to the base case.",
+        "3": "May think n does not change between calls.",
+        "n (unchanged, so the same call repeats)": "May think each call shares one n instead of having its own."
       }
     },
     {
@@ -136,10 +248,13 @@
           "1",
           "2",
           "3"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
-      "phase": "diagnostic",
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
+      "fallbackFeedback": {
+        "correct": "Yes: 1, 2, 3. The prints happen as the calls come back, last call first.",
+        "incorrect": "The print comes AFTER show(n - 1), so it waits until the deeper calls have finished. Step through the trace to see the order."
+      },
       "traceId": "show3",
       "commonWrongAnswers": [
         {
@@ -150,16 +265,11 @@
           ],
           "hint": "May think print runs before the recursive call, or does not see that print waits until the deeper calls return."
         }
-      ],
-      "fallbackFeedback": {
-        "correct": "Yes: 1, 2, 3. The prints happen as the calls come back, last call first.",
-        "incorrect": "The print comes AFTER show(n - 1), so it waits until the deeper calls have finished. Step through the trace to see the order."
-      }
+      ]
     },
     {
       "id": "d5",
       "kind": "mcq",
-      "phase": "diagnostic",
       "prompt": "Suppose the count function had no `if n == 0: return` check. What would happen when you run count(3)?",
       "code": "def count(n):\n    print(n)\n    count(n - 1)\n\ncount(3)",
       "options": [
@@ -176,17 +286,17 @@
       "requiresWhy": false,
       "answerKey": {
         "type": "option",
-        "value": "It keeps calling itself with 0, -1, -2, ... until Python raises a RecursionError",
-        "gradingNote": "Graded by CODE."
+        "value": "It keeps calling itself with 0, -1, -2, ... until Python raises a RecursionError"
+      },
+      "gradingNote": "Graded by CODE.",
+      "fallbackFeedback": {
+        "correct": "Right. Without a base case nothing ever stops the calls.",
+        "incorrect": "Nothing tells the function to stop at 0, so it keeps going: 0, -1, -2 ... until Python raises a RecursionError."
       },
       "optionHints": {
         "It prints 3, 2, 1 and stops normally": "May think the function stops by itself when n reaches 0.",
         "It prints 3 and stops": "May think the function runs only once.",
         "It returns None without printing": "Unclear on what a missing stop condition does."
-      },
-      "fallbackFeedback": {
-        "correct": "Right. Without a base case nothing ever stops the calls.",
-        "incorrect": "Nothing tells the function to stop at 0, so it keeps going: 0, -1, -2 ... until Python raises a RecursionError."
       }
     }
   ],
@@ -209,15 +319,13 @@
           "5",
           "3",
           "1"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
       "fallbackFeedback": {
         "correct": "Correct: 5, 3, 1.",
         "incorrect": "Each call passes n - 2, so n goes 5, 3, 1. At 1 the next value is -1, which is <= 0, so it stops."
-      },
-      "phase": "check",
-      "tier": 1
+      }
     },
     {
       "id": "c1b",
@@ -237,15 +345,13 @@
           "1",
           "2",
           "3"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
       "fallbackFeedback": {
         "correct": "Correct: 1, 2, 3.",
         "incorrect": "n counts up 1, 2, 3 and stops when n > 3."
-      },
-      "phase": "check",
-      "tier": 1
+      }
     },
     {
       "id": "c2a",
@@ -263,16 +369,14 @@
         "type": "tokens",
         "value": [
           "24"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
-      "whyRubric": "Full credit if the answer says factorial(2) returns 2 and that factorial(3) uses/multiplies that returned value (n * result = 3 * 2 = 6). Partial if it gets the number but not that the value is passed back to the caller. Judged by LLM; the number itself is graded by CODE.",
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
+      "rubric": "Full credit if the answer says factorial(2) returns 2 and that factorial(3) uses/multiplies that returned value (n * result = 3 * 2 = 6). Partial if it gets the number but not that the value is passed back to the caller. Judged by LLM; the number itself is graded by CODE.",
       "fallbackFeedback": {
         "correct": "Correct: 24.",
         "incorrect": "factorial(4) = 4 * factorial(3) = 4 * 6 = 24. Each call waits for the value returned by the call below it."
-      },
-      "phase": "check",
-      "tier": 2
+      }
     },
     {
       "id": "c2b",
@@ -290,16 +394,14 @@
         "type": "tokens",
         "value": [
           "10"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
-      "whyRubric": "Full credit if the answer says total(0) is the stopping point and its 0 is what the call above adds to (1 + 0), so the chain can finish. Partial if it only says 'it stops'. Judged by LLM; the number itself is graded by CODE.",
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
+      "rubric": "Full credit if the answer says total(0) is the stopping point and its 0 is what the call above adds to (1 + 0), so the chain can finish. Partial if it only says 'it stops'. Judged by LLM; the number itself is graded by CODE.",
       "fallbackFeedback": {
         "correct": "Correct: 10.",
         "incorrect": "4 + 3 + 2 + 1 + total(0), and total(0) returns 0, so the answer is 10."
-      },
-      "phase": "check",
-      "tier": 2
+      }
     },
     {
       "id": "c3a",
@@ -318,15 +420,13 @@
         "type": "tokens",
         "value": [
           "4"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
       "fallbackFeedback": {
         "correct": "Correct: 4. Each call peels off one character and adds 1.",
         "incorrect": "Each call returns 1 + the length of the rest of the string; the empty string returns 0, so \"code\" gives 4."
-      },
-      "phase": "check",
-      "tier": 3
+      }
     },
     {
       "id": "c3b",
@@ -344,15 +444,13 @@
         "type": "tokens",
         "value": [
           "cba"
-        ],
-        "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE."
+        ]
       },
+      "gradingNote": "Server: split the student's answer on whitespace/commas/newlines, strip quotes, compare token lists exactly. Graded by CODE.",
       "fallbackFeedback": {
         "correct": "Correct: cba.",
         "incorrect": "rev(\"abc\") = rev(\"bc\") + \"a\" = (rev(\"c\") + \"b\") + \"a\" = \"cba\"."
-      },
-      "phase": "check",
-      "tier": 3
+      }
     }
   ],
   "traces": {
@@ -675,5 +773,12 @@
         "6"
       ]
     }
-  }
+  },
+  "sources": [],
+  "notes": [
+    "All predict_output answer keys and traces were produced by running the code, not typed by hand. Re-run build_questions.py if you change any code sample.",
+    "Check rules: serve 3 questions, one per tier (1, 2, 3). Pick one from each tier at random, never reuse a question the session has already seen. Tier 3 is the transfer question. At least one question must have requiresWhy = true (tier 2).",
+    "commonWrongAnswers, optionHints and whyRubric are PROVISIONAL misconception hints for the LLM prompt. They are not a validated catalogue; have someone who teaches CS review them.",
+    "phase 'diagnostic' questions are asked in order d1, d2, then d3 only if d2 is wrong, then d4, d5, capped at 5 or earlier if the student skips."
+  ]
 }
