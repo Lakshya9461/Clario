@@ -11,8 +11,9 @@
 require("dotenv").config();
 
 const mongoose = require("mongoose");
-const { generatePack } = require("../packs/generate");
+const { generatePack, normalizeTopic } = require("../packs/generate");
 const { validatePack } = require("../packs/loader");
+const { Pack } = require("../models/models");
 
 const TOPICS = [
   { topic: "Photosynthesis", expect: "pack" },
@@ -153,6 +154,15 @@ async function main() {
   console.log(`mongo    : ${process.env.MONGO_URL || "(MONGO_URL is not set)"}`);
 
   await mongoose.connect(process.env.MONGO_URL || "mongodb://127.0.0.1:27017/clario");
+
+  // A second run would serve the cached packs and print no draft stats, which defeats the
+  // point of looking at a fresh draft. PREVIEW_FRESH=1 drops just these five topics first;
+  // the default never deletes anything.
+  if (process.env.PREVIEW_FRESH === "1") {
+    const keys = TOPICS.map((entry) => normalizeTopic(entry.topic).toLowerCase());
+    const { deletedCount } = await Pack.deleteMany({ topicKey: { $in: keys } });
+    console.log(`fresh run: dropped ${deletedCount} cached pack(s) for these topics`);
+  }
 
   const results = [];
   try {
