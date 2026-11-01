@@ -191,6 +191,17 @@ test("generates a validated draft pack", async () => {
   assert.equal(validation.valid, true);
 
   assert.equal(mcqsOf(pack).length, 14);
+  for (const section of ["diagnostic", "check"]) {
+    const list = pack[section];
+    assert.ok(
+      list.filter((question) => question.kind === "mcq").length >= 2,
+      `${section} must keep at least 2 mcq`
+    );
+    assert.ok(
+      list.filter((question) => question.kind === "free_text").length <= 2,
+      `${section} must keep at most 2 free_text`
+    );
+  }
   assert.equal(store.saved.get("sample topic").pack.packId, pack.packId);
 });
 
@@ -355,6 +366,16 @@ test("rejects a check question that applies nothing at difficulty 3", async () =
   await assert.rejects(generate({ llm, store: memoryStore() }), (error) => error.code === "topic_not_supported");
 });
 
+test("rejects a draft with more than two free_text questions per list", async () => {
+  const broken = questionFixture();
+  broken.check[2] = freeText("c3", 2, { requiresWhy: true }); // 3 free_text in the check list
+  broken.check[3] = freeText("c4", 2, { requiresWhy: true });
+  const llm = makeFakeLlm({ questions: () => broken });
+
+  await assert.rejects(generate({ llm, store: memoryStore() }), (error) => error.code === "topic_not_supported");
+  assert.equal(llm.count("questions"), 2);
+});
+
 // --- self-consistency ----------------------------------------------------
 
 test("drops the mcq questions whose key the model does not reproduce", async () => {
@@ -395,6 +416,25 @@ test("reports topic_not_supported when too few questions survive, after one retr
   assert.equal(llm.count("questions"), 2, "the whole draft is retried once");
   assert.equal(llm.count("selfcheck"), 28, "14 mcq checked on each attempt");
   assert.equal(store.saved.size, 0);
+});
+
+test("reports topic_not_supported when fewer than two mcq survive a list", async () => {
+  // Two free_text questions at difficulty 1 and 2, so one surviving mcq still covers the
+  // tiers and the minimum count. Only the mcq floor can catch this.
+  const fixture = questionFixture();
+  fixture.diagnostic[4] = freeText("d5", 2);
+  const drop = new Set(["d1", "d3", "d4", "d7", "d8"]);
+  const llm = makeFakeLlm({
+    questions: () => fixture,
+    selfCheck: (text) => (drop.has(questionIdFromPrompt(text)) ? wrongIndexFromPrompt(text) : correctIndexFromPrompt(text)),
+  });
+  const store = memoryStore();
+
+  await assert.rejects(generate({ llm, store }), (error) => {
+    assert.equal(error.code, "topic_not_supported");
+    return true;
+  });
+  assert.equal(store.saved.size, 0, "a pack with one mcq per list is not served");
 });
 
 test("the self-check prompt contains no answer key", async () => {

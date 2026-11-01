@@ -7,7 +7,8 @@
     "dev": "node --watch index.js",
     "start": "node index.js",
     "test": "node --test",
-    "smoke": "node scripts/llm-smoke.js"
+    "smoke": "node scripts/llm-smoke.js",
+    "generate:preview": "node scripts/generate-preview.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

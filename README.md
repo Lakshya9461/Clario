@@ -89,20 +89,26 @@ Questions with `answerKey: null` and `kind: "mcq"` are self-report items: they p
 
 `server/packs/generate.js` turns a topic the app has no curated pack for into a draft:
 concepts (8–14, graph validated), then 8 diagnostic + 8 check questions (at least 2/3/3
-across difficulty 1/2/3 per list, one free-text each), then a self-consistency pass in
+across difficulty 1/2/3 per list, 1–2 free-text each), then a self-consistency pass in
 which every mcq is re-answered by the model without the key and dropped if the answers
 disagree. Options are shuffled in code before that check, so the order the model happened
-to write cannot pass it. What survives is kept: a pack needs 3 questions per list with one
-per difficulty, and is retried once as a whole before `topic_not_supported` (HTTP 422) is
-raised. An unreachable model is not an unsupported topic: it raises
-`generation_unavailable` (HTTP 503) and no pack is invented. Drafts are stored in the
-`packs` collection and cached by normalized topic, so the same topic is never drafted
-twice.
+to write cannot pass it. What survives is kept: a pack needs 3 questions per list (at
+least 2 of them mcq, at most 2 free-text) with one per difficulty, and the draft is
+retried once as a whole before `topic_not_supported` (HTTP 422) is raised. An unreachable
+model is not an unsupported topic: it raises `generation_unavailable` (HTTP 503) and no
+pack is invented. Drafts are stored in the `packs` collection and cached by normalized
+topic, so the same topic is never drafted twice.
 
 Prompts live in the `prompts` export of that file. All of them wrap user-supplied text in
 tags, defuse closing tags inside it, and tell the model it is data, never instructions.
 With source text the model is told to use only that text as its factual basis; with none,
 to use general knowledge and never invent a citation or URL.
+
+`npm run generate:preview` runs generation for five topics against Strata and Mongo
+(three real, one nonsense, one prompt-injection attempt) and prints, per topic: the time
+taken, the pack id and validator result, how many questions the self-check drafted and
+dropped, the concept graph, and three questions with their keys. It exits non-zero if a
+topic does not land where expected or if a pack echoes any of our own prompt text.
 
 ## Status
 

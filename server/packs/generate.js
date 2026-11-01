@@ -24,6 +24,10 @@ const MAX_QUESTIONS_PER_LIST = 10;
 // Minimum questions per difficulty (1/2/3) in a draft. Slack at every tier means dropping a
 // question cannot wipe out a tier and flatten the pack's difficulty ramp.
 const MIN_QUESTIONS_PER_TIER = [2, 3, 3];
+// A pack is mostly auto-gradable mcq: at least 2 mcq must survive per list, and a list may
+// carry at most 2 free_text questions (they need an LLM to grade).
+const MIN_SURVIVING_MCQ = 2;
+const MAX_FREE_TEXT = 2;
 const MIN_SURVIVING = 3; // per list, and one per difficulty tier
 const TIERS = [1, 2, 3];
 const PACK_VERSION = "0.1-beta";
@@ -173,7 +177,7 @@ function questionsMessages({ topic, goal, sources, concepts }) {
         `Each list: at least ${MIN_QUESTIONS_PER_TIER[0]} at difficulty 1, at least ${MIN_QUESTIONS_PER_TIER[1]} at difficulty 2, at least ${MIN_QUESTIONS_PER_TIER[2]} at difficulty 3.`,
         "Diagnostic questions: transfer false and requiresWhy false.",
         "Check questions: every difficulty-2 question has requiresWhy true and a rubric for the explanation; every difficulty-3 question has transfer true, applying the idea to a situation the student has not seen; every other check question has transfer false.",
-        'At least one question in each list is "free_text". Omit fields that do not apply to the question kind.',
+        'Each list has at least one and at most two "free_text" questions; the rest are "mcq". Omit fields that do not apply to the question kind.',
         "",
         "Return:",
         '{"diagnostic":[{"id":"...","kind":"mcq|free_text","prompt":"...","options":["a","b","c","d"],"correctOptionIndex":0,"conceptIds":["id"],"difficulty":1,"transfer":false,"requiresWhy":false,"rubric":"...","feedback":{"correct":"...","incorrect":"..."}}],"check":[...]}',
@@ -366,8 +370,10 @@ function draftErrors(list, section, conceptIds) {
     }
   }
 
-  if (!list.some((question) => question.kind === "free_text")) {
-    errors.push(`${section}: no free_text question`);
+  const freeTextCount = list.filter((question) => question.kind === "free_text").length;
+  if (freeTextCount === 0) errors.push(`${section}: no free_text question`);
+  if (freeTextCount > MAX_FREE_TEXT) {
+    errors.push(`${section}: at most ${MAX_FREE_TEXT} free_text questions, got ${freeTextCount}`);
   }
 
   return errors;
@@ -416,12 +422,29 @@ function toPackQuestion(question, id) {
 
 function survivalErrors(diagnostic, check) {
   const errors = [];
-  if (diagnostic.length < MIN_SURVIVING) errors.push(`only ${diagnostic.length} diagnostic questions survived`);
-  if (check.length < MIN_SURVIVING) errors.push(`only ${check.length} check questions survived`);
-  for (const tier of TIERS) {
-    if (!diagnostic.some((question) => question.difficulty === tier)) errors.push(`no diagnostic question at difficulty ${tier} survived`);
-    if (!check.some((question) => question.difficulty === tier)) errors.push(`no check question at difficulty ${tier} survived`);
+  const lists = [
+    ["diagnostic", diagnostic],
+    ["check", check],
+  ];
+
+  for (const [section, list] of lists) {
+    if (list.length < MIN_SURVIVING) {
+      errors.push(`only ${list.length} ${section} questions survived, ${MIN_SURVIVING} are needed`);
+    }
+    const mcqCount = list.filter((question) => question.kind !== "free_text").length;
+    if (mcqCount < MIN_SURVIVING_MCQ) {
+      errors.push(`only ${mcqCount} ${section} mcq survived, ${MIN_SURVIVING_MCQ} are needed`);
+    }
+    if (list.filter((question) => question.kind === "free_text").length > MAX_FREE_TEXT) {
+      errors.push(`more than ${MAX_FREE_TEXT} ${section} free_text questions survived`);
+    }
+    for (const tier of TIERS) {
+      if (!list.some((question) => question.difficulty === tier)) {
+        errors.push(`no ${section} question at difficulty ${tier} survived`);
+      }
+    }
   }
+
   return errors;
 }
 
@@ -546,20 +569,35 @@ async function keepConsistent({ diagnostic, check, chatJsonFn }) {
   });
 
   const survivors = new Set(questions.filter((question, index) => kept[index]));
-  return {
+  const surviving = {
     diagnostic: diagnostic.filter((question) => survivors.has(question)),
     check: check.filter((question) => survivors.has(question)),
   };
+  return {
+    ...surviving,
+    dropped: {
+      diagnostic: diagnostic.length - surviving.diagnostic.length,
+      check: check.length - surviving.check.length,
+    },
+  };
 }
 
-// Draft a full question list, then keep only what survives the self-check. null means the
-// attempt produced nothing usable, so the caller retries once.
+// Draft a full question list, then keep only what survives the self-check. A null `surviving`
+// means the attempt produced nothing usable, so the caller retries once. The counts travel
+// with it so a caller can show how many questions the check threw away.
 async function draftSurvivingQuestions({ topic, goal, sources, concepts, conceptIds, chatJsonFn }) {
   const draft = await draftQuestions({ topic, goal, sources, concepts, conceptIds, chatJsonFn });
-  if (!draft) return null;
+  if (!draft) return { surviving: null, drafted: null, dropped: null };
 
   const surviving = await keepConsistent({ ...draft, chatJsonFn });
-  return survivalErrors(surviving.diagnostic, surviving.check).length ? null : surviving;
+  const stats = {
+    drafted: { diagnostic: draft.diagnostic.length, check: draft.check.length },
+    dropped: surviving.dropped,
+  };
+  if (survivalErrors(surviving.diagnostic, surviving.check).length) {
+    return { surviving: null, ...stats };
+  }
+  return { surviving, ...stats };
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +611,7 @@ async function generatePack({ topic, goal = "", sourceChunks = [], deps = {} } =
   const chatJsonFn = deps.chatJson || chatJson;
 
   const cached = await store.findByTopicKey(topicKey);
-  if (cached) return { pack: cached, cached: true };
+  if (cached) return { pack: cached, cached: true, stats: null };
 
   const sources = toSources(sourceChunks);
   const studentGoal = String(goal || "").slice(0, 40);
@@ -589,10 +627,17 @@ async function generatePack({ topic, goal = "", sourceChunks = [], deps = {} } =
 
   // Step 3 + 4. Questions, then self-consistency. The attempt is retried as a whole, because
   // what matters is what SURVIVES the check, not what was drafted. After the retry, a draft
-  // that cannot keep 3 questions per list with one per tier means the topic is not supported.
+  // that cannot keep the floor (3 per list, 2 mcq per list, one per tier) means the topic is
+  // not supported. Counts are summed across attempts so the caller can show the real cost.
   let surviving = null;
+  const stats = {
+    attempts: 0,
+    drafted: { diagnostic: 0, check: 0 },
+    dropped: { diagnostic: 0, check: 0 },
+  };
+
   for (let attempt = 1; attempt <= 2 && !surviving; attempt += 1) {
-    surviving = await draftSurvivingQuestions({
+    const result = await draftSurvivingQuestions({
       topic: normalizedTopic,
       goal: studentGoal,
       sources,
@@ -600,6 +645,15 @@ async function generatePack({ topic, goal = "", sourceChunks = [], deps = {} } =
       conceptIds,
       chatJsonFn,
     });
+
+    stats.attempts = attempt;
+    if (result.drafted) {
+      for (const section of ["diagnostic", "check"]) {
+        stats.drafted[section] += result.drafted[section];
+        stats.dropped[section] += result.dropped[section];
+      }
+    }
+    surviving = result.surviving;
   }
   if (!surviving) throw new TopicNotSupportedError();
 
@@ -620,7 +674,7 @@ async function generatePack({ topic, goal = "", sourceChunks = [], deps = {} } =
   if (!valid) throw new TopicNotSupportedError();
 
   const stored = await store.save({ topicKey, topic: normalizedTopic, pack });
-  return { pack: stored, cached: false };
+  return { pack: stored, cached: false, stats };
 }
 
 module.exports = {
