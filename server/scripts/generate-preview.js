@@ -148,16 +148,22 @@ async function runTopic({ topic, expect }) {
   return { topic, expect, actual: echoes.length ? "prompt_echo" : "pack", ms: elapsed };
 }
 
+// A connection string carries the password. It may appear in a run log, so it is redacted
+// before it is printed.
+function redactUrl(url) {
+  return url.replace(/\/\/([^:/@]+):[^@]*@/, "//$1:<redacted>@");
+}
+
 async function main() {
   const mongoUrl = process.env.MONGO_URL || "mongodb://127.0.0.1:27017/clario";
   console.log(`base url : ${process.env.LLM_BASE_URL || "http://127.0.0.1:8080/v1 (default)"}`);
   console.log(`model    : ${process.env.LLM_MODEL || "(LLM_MODEL is not set)"}`);
-  console.log(`mongo    : ${mongoUrl}`);
+  console.log(`mongo    : ${redactUrl(mongoUrl)}`);
 
   try {
-    await mongoose.connect(mongoUrl, { serverSelectionTimeoutMS: 5000 });
+    await mongoose.connect(mongoUrl, { serverSelectionTimeoutMS: 15000 });
   } catch (error) {
-    console.error(`cannot reach MongoDB at ${mongoUrl}: ${error.message}`);
+    console.error(`cannot reach MongoDB at ${redactUrl(mongoUrl)}: ${error.message}`);
     console.error("Start MongoDB first, then rerun: npm run generate:preview");
     process.exitCode = 1;
     return;
