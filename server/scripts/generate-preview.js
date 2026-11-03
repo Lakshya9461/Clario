@@ -149,11 +149,19 @@ async function runTopic({ topic, expect }) {
 }
 
 async function main() {
+  const mongoUrl = process.env.MONGO_URL || "mongodb://127.0.0.1:27017/clario";
   console.log(`base url : ${process.env.LLM_BASE_URL || "http://127.0.0.1:8080/v1 (default)"}`);
   console.log(`model    : ${process.env.LLM_MODEL || "(LLM_MODEL is not set)"}`);
-  console.log(`mongo    : ${process.env.MONGO_URL || "(MONGO_URL is not set)"}`);
+  console.log(`mongo    : ${mongoUrl}`);
 
-  await mongoose.connect(process.env.MONGO_URL || "mongodb://127.0.0.1:27017/clario");
+  try {
+    await mongoose.connect(mongoUrl, { serverSelectionTimeoutMS: 5000 });
+  } catch (error) {
+    console.error(`cannot reach MongoDB at ${mongoUrl}: ${error.message}`);
+    console.error("Start MongoDB first, then rerun: npm run generate:preview");
+    process.exitCode = 1;
+    return;
+  }
 
   // A second run would serve the cached packs and print no draft stats, which defeats the
   // point of looking at a fresh draft. PREVIEW_FRESH=1 drops just these five topics first;
