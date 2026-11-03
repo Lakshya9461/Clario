@@ -4,7 +4,15 @@
 // report "degraded". Rule 9: prompts and answers are never logged.
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8080/v1";
+// Generation asks for ~2k tokens of JSON, which a slow model can take well over a minute to
+// produce. A local default keeps the beta responsive; LLM_TIMEOUT_MS raises it for a model that
+// needs longer without changing any call site.
 const DEFAULT_TIMEOUT_MS = 90_000;
+
+function timeoutFromEnv() {
+  const value = Number(process.env.LLM_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
+}
 const TEMPERATURE = 0.3;
 
 // Queue: at most 2 requests in flight, at most 3 waiting behind them.
@@ -62,12 +70,69 @@ function requireModel() {
   return model;
 }
 
+// Reads a server-sent-event stream and returns the concatenated assistant text. `reasoning_content`
+// deltas are deliberately dropped: they are the model's scratchpad, not its answer, and would
+// corrupt the JSON we parse. `: keep-alive` comments and blank lines are ignored.
+async function readEventStream(response) {
+  const stream = response.body;
+  if (!stream || typeof stream.getReader !== "function") {
+    throw new LlmError("LLM returned an event stream with no body.");
+  }
+
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+  let done = false;
+
+  // Returns true when the stream signalled its end.
+  const handleLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) return false; // blank lines and ": keep-alive"
+    const payload = trimmed.slice("data:".length).trim();
+    if (payload === "[DONE]") return true;
+
+    let event;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return false; // a partial or non-JSON event is not fatal; the answer may still arrive
+    }
+
+    const delta = event?.choices?.[0]?.delta;
+    if (typeof delta?.content === "string") content += delta.content;
+    return false;
+  };
+
+  while (!done) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+
+    buffer += decoder.decode(chunk.value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (handleLine(line)) {
+        done = true;
+        break;
+      }
+    }
+  }
+
+  // A stream can end without a trailing newline; the last line still counts.
+  if (!done && buffer) handleLine(buffer);
+
+  reader.cancel().catch(() => {});
+  return content;
+}
+
 // One completion. Returns the message content as a string.
 // options: { json?: boolean, timeoutMs?: number, fetch?: typeof fetch }  (fetch is for tests)
 async function chat(messages, options = {}) {
   const {
     json = false,
-    timeoutMs = DEFAULT_TIMEOUT_MS,
+    timeoutMs = timeoutFromEnv(),
     fetch: fetchImpl = globalThis.fetch,
   } = options;
 
@@ -76,7 +141,10 @@ async function chat(messages, options = {}) {
     const baseUrl = (process.env.LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
     const apiKey = process.env.LLM_API_KEY;
 
-    const body = { model, messages, temperature: TEMPERATURE };
+    // Streaming is what makes a slow model usable: a proxy in front of the LLM (Cloudflare, for
+    // one) gives up on a request with no bytes after ~100s, but keeps a stream open. The server
+    // may ignore `stream` and answer with one JSON body; both are handled below.
+    const body = { model, messages, temperature: TEMPERATURE, stream: true };
     if (json) body.response_format = { type: "json_object" };
 
     let response;
@@ -103,14 +171,21 @@ async function chat(messages, options = {}) {
       throw new LlmError(`LLM returned HTTP ${response.status}: ${detail.slice(0, 200)}`);
     }
 
-    let data;
+    const contentType = response.headers?.get?.("content-type") || "";
+    let content;
     try {
-      data = await response.json();
-    } catch {
-      throw new LlmError("LLM returned a body that is not JSON.");
+      content = contentType.includes("text/event-stream")
+        ? await readEventStream(response)
+        : (await response.json())?.choices?.[0]?.message?.content;
+    } catch (error) {
+      if (error instanceof LlmError) throw error;
+      const reason =
+        error.name === "TimeoutError"
+          ? `stream did not finish within ${timeoutMs}ms`
+          : `stream failed (${error.message})`;
+      throw new LlmError(`LLM ${reason}.`);
     }
 
-    const content = data?.choices?.[0]?.message?.content;
     if (typeof content !== "string" || !content.trim()) {
       throw new LlmError("LLM returned no content.");
     }
@@ -184,6 +259,7 @@ module.exports = {
   LlmBusyError,
   LlmError,
   DEFAULT_TIMEOUT_MS,
+  timeoutFromEnv,
   MAX_CONCURRENT,
   MAX_QUEUED,
 };

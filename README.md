@@ -25,7 +25,13 @@ cd ../client && npm install
 ```
 
 `.env` lives only in `server/` and is git-ignored. Keys: `PORT`, `MONGO_URL`,
-`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `CLIENT_ORIGIN`.
+`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_MS`, `CLIENT_ORIGIN`.
+`LLM_TIMEOUT_MS` is optional (default 90000) and caps one completion, streaming included.
+
+The LLM client streams every completion. Generation asks for ~2k tokens of JSON, which a
+slow model can take minutes over, and a proxy in front of the LLM (Cloudflare and friends)
+aborts a request that has sent nothing for about 100 seconds while it keeps a stream alive.
+A server that ignores `stream` and answers with one JSON body still works.
 
 ## Run
 

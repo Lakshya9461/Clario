@@ -2,7 +2,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { z } = require("zod");
-const { chat, chatJson, LlmBusyError, LlmError } = require("./llm");
+const { chat, chatJson, LlmBusyError, LlmError, DEFAULT_TIMEOUT_MS, timeoutFromEnv } = require("./llm");
 
 const schema = z.object({ alpha: z.string() });
 const fallback = { alpha: "fallback" };
@@ -130,4 +130,113 @@ test("chat refuses to run without LLM_MODEL configured", async () => {
   } finally {
     if (previousModel !== undefined) process.env.LLM_MODEL = previousModel;
   }
+});
+
+test("LLM_TIMEOUT_MS raises the timeout, and bad values fall back to the default", () => {
+  const previous = process.env.LLM_TIMEOUT_MS;
+  try {
+    process.env.LLM_TIMEOUT_MS = "240000";
+    assert.equal(timeoutFromEnv(), 240000);
+    for (const bad of ["", "abc", "0", "-5", undefined]) {
+      process.env.LLM_TIMEOUT_MS = bad;
+      assert.equal(timeoutFromEnv(), DEFAULT_TIMEOUT_MS, `should ignore ${JSON.stringify(bad)}`);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.LLM_TIMEOUT_MS;
+    else process.env.LLM_TIMEOUT_MS = previous;
+  }
+});
+
+// --- streaming -----------------------------------------------------------
+// A slow model behind a proxy needs streaming: the proxy aborts a silent request. These fakes
+// serve the stream as a real Response so the parsing path is exercised, not stubbed.
+
+function sseResponse(lines, { contentLength } = {}) {
+  const body = contentLength === undefined
+    ? lines.join("\n")
+    : lines.join("\n").slice(0, contentLength);
+  return new Response(body, {
+    status: 200,
+    headers: { "content-type": "text/event-stream" },
+  });
+}
+
+function sseChunk(content, extra = {}) {
+  return `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content, ...extra } }] })}`;
+}
+
+async function chatWith(fetchBody, fetchImpl) {
+  const previousModel = process.env.LLM_MODEL;
+  process.env.LLM_MODEL = "fake-model";
+  try {
+    return await chat([{ role: "user", content: "x" }], { fetch: fetchImpl });
+  } finally {
+    if (previousModel === undefined) delete process.env.LLM_MODEL;
+    else process.env.LLM_MODEL = previousModel;
+  }
+}
+
+test("streams an event stream into one string and asks for stream: true", async () => {
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    seen.push({ url, body: JSON.parse(init.body) });
+    return sseResponse([
+      sseChunk(""),
+      ": keep-alive",
+      "",
+      sseChunk('{"concepts":'),
+      sseChunk("[]}"),
+      "data: [DONE]",
+    ]);
+  };
+
+  const content = await chatWith(null, fetchImpl);
+
+  assert.equal(content, '{"concepts":[]}');
+  assert.equal(seen[0].body.stream, true, "the request must ask the server to stream");
+});
+
+test("reasoning_content deltas never leak into the answer", async () => {
+  const fetchImpl = async () =>
+    sseResponse([
+      sseChunk(null, { reasoning_content: "let me think about the topic" }),
+      sseChunk('{"answer":'),
+      sseChunk("1}"),
+      "data: [DONE]",
+    ]);
+
+  assert.equal(await chatWith(null, fetchImpl), '{"answer":1}');
+});
+
+test("a stream that ends without [DONE] still returns what arrived", async () => {
+  const fetchImpl = async () => sseResponse([sseChunk('{"partial":true}')]);
+  assert.equal(await chatWith(null, fetchImpl), '{"partial":true}');
+});
+
+test("an empty stream is an error, not empty content", async () => {
+  const fetchImpl = async () => sseResponse([": keep-alive", "", "data: [DONE]"]);
+  await assert.rejects(chatWith(null, fetchImpl), (error) => {
+    assert.ok(error instanceof LlmError);
+    assert.match(error.message, /no content/i);
+    return true;
+  });
+});
+
+test("a server that ignores stream and answers JSON still works", async () => {
+  const fetchImpl = async () =>
+    new Response(JSON.stringify({ choices: [{ message: { content: "plain" } }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+
+  assert.equal(await chatWith(null, fetchImpl), "plain");
+});
+
+test("a JSON reply inside an event stream still validates through chatJson", async () => {
+  const fetchImpl = async () => sseResponse([sseChunk('{"alpha":'), sseChunk('"streamed"}'), "data: [DONE]"]);
+  const result = await chatJson([{ role: "user", content: "hi" }], schema, fallback, {
+    chat: (messages, options) => chatWith(messages, fetchImpl),
+  });
+
+  assert.deepEqual(result, { value: { alpha: "streamed" }, degraded: false });
 });
