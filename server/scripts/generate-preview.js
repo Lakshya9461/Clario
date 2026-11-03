@@ -10,7 +10,7 @@
 
 require("dotenv").config();
 
-const mongoose = require("mongoose");
+const db = require("../db");
 const { generatePack, normalizeTopic } = require("../packs/generate");
 const { validatePack } = require("../packs/loader");
 const { Pack } = require("../models/models");
@@ -148,22 +148,15 @@ async function runTopic({ topic, expect }) {
   return { topic, expect, actual: echoes.length ? "prompt_echo" : "pack", ms: elapsed };
 }
 
-// A connection string carries the password. It may appear in a run log, so it is redacted
-// before it is printed.
-function redactUrl(url) {
-  return url.replace(/\/\/([^:/@]+):[^@]*@/, "//$1:<redacted>@");
-}
-
 async function main() {
-  const mongoUrl = process.env.MONGO_URL || "mongodb://127.0.0.1:27017/clario";
   console.log(`base url : ${process.env.LLM_BASE_URL || "http://127.0.0.1:8080/v1 (default)"}`);
   console.log(`model    : ${process.env.LLM_MODEL || "(LLM_MODEL is not set)"}`);
-  console.log(`mongo    : ${redactUrl(mongoUrl)}`);
+  console.log(`mongo    : ${db.redactUrl(db.mongoUrl())}`);
 
   try {
-    await mongoose.connect(mongoUrl, { serverSelectionTimeoutMS: 15000 });
+    await db.connect();
   } catch (error) {
-    console.error(`cannot reach MongoDB at ${redactUrl(mongoUrl)}: ${error.message}`);
+    console.error(`cannot reach MongoDB at ${db.redactUrl(db.mongoUrl())}: ${error.message}`);
     console.error("Start MongoDB first, then rerun: npm run generate:preview");
     process.exitCode = 1;
     return;
@@ -182,7 +175,7 @@ async function main() {
   try {
     for (const entry of TOPICS) results.push(await runTopic(entry));
   } finally {
-    await mongoose.disconnect();
+    await db.disconnect();
   }
 
   console.log("");

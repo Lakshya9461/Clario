@@ -139,6 +139,10 @@ async function chatJson(messages, schema, fallback, options = {}) {
       content = await call(attemptMessages, chatOptions);
     } catch (error) {
       if (error instanceof LlmBusyError) throw error;
+      // The message says which request failed and why (status, timeout, transport). It never
+      // contains the prompt or the answer, so this is safe to log and is the only way to tell
+      // "the server rejected us" from "the network is down" without guessing.
+      console.warn(`[llm] request failed: ${error.message}`);
       return { value: fallback, degraded: true, reason: "unavailable" };
     }
 
