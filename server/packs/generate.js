@@ -458,10 +458,18 @@ const mongoStore = {
 // Steps
 // ---------------------------------------------------------------------------
 
+// The self-check answer is `{"answerIndex":0}`. Thinking is switched off for it (llm.js
+// `reasoning: "off"`), so a small cap is enough — but if a server ignores that switch, thinking
+// would eat the cap and the question would be dropped, so this is measured, not guessed.
+const SELF_CHECK_MAX_TOKENS = 64;
+
 // One validated LLM reply. null means the reply was unusable, which a retry may fix.
 // "Could not reach the model" is thrown instead: that is a broken dependency, not a bad topic.
-async function askJson(chatJsonFn, messages, schema, fallback) {
-  const { value, degraded, reason } = await chatJsonFn(messages, schema, fallback, { json: true });
+async function askJson(chatJsonFn, messages, schema, fallback, options = {}) {
+  const { value, degraded, reason } = await chatJsonFn(messages, schema, fallback, {
+    json: true,
+    ...options,
+  });
   if (!degraded) return value;
   if (reason === "unavailable") throw new GenerationUnavailableError();
   return null;
@@ -499,9 +507,13 @@ async function draftQuestions({ topic, goal, sources, concepts, conceptIds, chat
 
 // Step 4: ask the model to answer each mcq without the key; keep it only if it agrees.
 async function consistentMcq(question, chatJsonFn) {
-  const value = await askJson(chatJsonFn, selfCheckMessages({ question }), selfCheckResponseSchema, {
-    answerIndex: -1,
-  });
+  const value = await askJson(
+    chatJsonFn,
+    selfCheckMessages({ question }),
+    selfCheckResponseSchema,
+    { answerIndex: -1 },
+    { reasoning: "off", maxTokens: SELF_CHECK_MAX_TOKENS }
+  );
   return value !== null && value.answerIndex === question.correctOptionIndex;
 }
 
@@ -645,6 +657,13 @@ module.exports = {
   normalizeTopic,
   toSources,
   prompts,
+  // Exported for the self-check benchmark (scripts/bench-selfcheck.js): it must measure the real
+  // prompt, schema and call options rather than a copy of them that could drift.
+  selfCheckResponseSchema,
+  consistentMcq,
+  mapWithLimit,
+  SELF_CHECK_BATCH,
+  SELF_CHECK_MAX_TOKENS,
   TopicNotSupportedError,
   InvalidTopicError,
   GenerationUnavailableError,
