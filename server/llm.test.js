@@ -240,3 +240,75 @@ test("a JSON reply inside an event stream still validates through chatJson", asy
 
   assert.deepEqual(result, { value: { alpha: "streamed" }, degraded: false });
 });
+
+// --- per-call reasoning and token budget ---------------------------------
+
+function bodyCapture() {
+  const bodies = [];
+  const impl = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  return { impl, bodies };
+}
+
+async function chatWithOptions(options) {
+  const previousModel = process.env.LLM_MODEL;
+  process.env.LLM_MODEL = "fake-model";
+  const { impl, bodies } = bodyCapture();
+  try {
+    await chat([{ role: "user", content: "x" }], { ...options, fetch: impl });
+  } finally {
+    if (previousModel === undefined) delete process.env.LLM_MODEL;
+    else process.env.LLM_MODEL = previousModel;
+  }
+  return bodies[0];
+}
+
+test('reasoning "off" asks the server to disable thinking', async () => {
+  const body = await chatWithOptions({ reasoning: "off", maxTokens: 32 });
+  assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
+  assert.equal(body.reasoning_effort, undefined);
+  assert.equal(body.max_tokens, 32);
+});
+
+test('reasoning "low" sends reasoning_effort and no template kwargs', async () => {
+  const body = await chatWithOptions({ reasoning: "low" });
+  assert.equal(body.reasoning_effort, "low");
+  assert.equal(body.chat_template_kwargs, undefined);
+});
+
+test("reasoning default and an omitted option send neither field", async () => {
+  for (const options of [{ reasoning: "default" }, {}]) {
+    const body = await chatWithOptions(options);
+    assert.equal(body.reasoning_effort, undefined);
+    assert.equal(body.chat_template_kwargs, undefined);
+    assert.equal(body.max_tokens, undefined);
+  }
+});
+
+test("an unknown reasoning mode is a caller bug, not a degraded answer", async () => {
+  await assert.rejects(chatWithOptions({ reasoning: "of" }), TypeError);
+
+  const { fn } = fakeChat([JSON.stringify({ alpha: "one" })]);
+  await assert.rejects(
+    chatJson([{ role: "user", content: "hi" }], schema, fallback, { chat: fn, reasoning: "of" }),
+    TypeError
+  );
+  assert.equal(fn.name, "fn");
+});
+
+test("chatJson hands reasoning and maxTokens to the model call", async () => {
+  const { fn, calls } = fakeChat([JSON.stringify({ alpha: "one" })]);
+  await chatJson([{ role: "user", content: "hi" }], schema, fallback, {
+    chat: fn,
+    reasoning: "off",
+    maxTokens: 24,
+  });
+
+  assert.equal(calls[0].options.reasoning, "off");
+  assert.equal(calls[0].options.maxTokens, 24);
+});

@@ -15,6 +15,25 @@ function timeoutFromEnv() {
 }
 const TEMPERATURE = 0.3;
 
+// How much the model may think before answering. This model emits reasoning tokens by default,
+// which costs tens of seconds per call; a one-word answer does not need them.
+//   "off"     ask the server not to think at all (chat_template_kwargs, the vLLM/llama.cpp knob)
+//   "low"     let it think a little (OpenAI's reasoning_effort)
+//   "default" leave the server's own behaviour alone
+// Anything else is a typo, and silently thinking when the caller asked not to is a latency bug,
+// so it throws instead of falling back.
+const REASONING_MODES = new Set(["off", "low", "default"]);
+
+function reasoningFields(reasoning) {
+  if (reasoning === undefined || reasoning === "default") return {};
+  if (!REASONING_MODES.has(reasoning)) {
+    throw new TypeError(`unknown reasoning mode "${reasoning}"`);
+  }
+  return reasoning === "off"
+    ? { chat_template_kwargs: { enable_thinking: false } }
+    : { reasoning_effort: "low" };
+}
+
 // Queue: at most 2 requests in flight, at most 3 waiting behind them.
 const MAX_CONCURRENT = 2;
 const MAX_QUEUED = 3;
@@ -128,13 +147,18 @@ async function readEventStream(response) {
 }
 
 // One completion. Returns the message content as a string.
-// options: { json?: boolean, timeoutMs?: number, fetch?: typeof fetch }  (fetch is for tests)
+// options: { json?, timeoutMs?, reasoning?, maxTokens?, fetch? }  (fetch is for tests)
 async function chat(messages, options = {}) {
   const {
     json = false,
     timeoutMs = timeoutFromEnv(),
+    reasoning,
+    maxTokens,
     fetch: fetchImpl = globalThis.fetch,
   } = options;
+
+  // Outside withQueue on purpose: a bad option is a caller bug, and it must not occupy a slot.
+  const thinking = reasoningFields(reasoning);
 
   return withQueue(async () => {
     const model = requireModel();
@@ -144,8 +168,9 @@ async function chat(messages, options = {}) {
     // Streaming is what makes a slow model usable: a proxy in front of the LLM (Cloudflare, for
     // one) gives up on a request with no bytes after ~100s, but keeps a stream open. The server
     // may ignore `stream` and answer with one JSON body; both are handled below.
-    const body = { model, messages, temperature: TEMPERATURE, stream: true };
+    const body = { model, messages, temperature: TEMPERATURE, stream: true, ...thinking };
     if (json) body.response_format = { type: "json_object" };
+    if (maxTokens) body.max_tokens = maxTokens;
 
     let response;
     try {
@@ -201,7 +226,16 @@ async function chat(messages, options = {}) {
 // model replied nonsense" deserve different answers: "unavailable" or "invalid".
 async function chatJson(messages, schema, fallback, options = {}) {
   const call = options.chat || chat;
-  const chatOptions = { json: true, timeoutMs: options.timeoutMs, fetch: options.fetch };
+  // Validate here as well: an injected `chat` (tests, or a wrapped client) would otherwise skip
+  // the check and, for "off", silently pay for thinking the caller asked to skip.
+  reasoningFields(options.reasoning);
+  const chatOptions = {
+    json: true,
+    timeoutMs: options.timeoutMs,
+    reasoning: options.reasoning,
+    maxTokens: options.maxTokens,
+    fetch: options.fetch,
+  };
 
   let lastContent = null;
   let lastIssues = [];
@@ -213,7 +247,9 @@ async function chatJson(messages, schema, fallback, options = {}) {
         attempt === 1 ? messages : [...messages, ...retryMessages(lastContent, lastIssues)];
       content = await call(attemptMessages, chatOptions);
     } catch (error) {
-      if (error instanceof LlmBusyError) throw error;
+      // A busy queue is the client's problem to retry; a bad option (TypeError) is ours and must
+      // not be dressed up as "the model was unavailable".
+      if (error instanceof LlmBusyError || error instanceof TypeError) throw error;
       // The message says which request failed and why (status, timeout, transport). It never
       // contains the prompt or the answer, so this is safe to log and is the only way to tell
       // "the server rejected us" from "the network is down" without guessing.
