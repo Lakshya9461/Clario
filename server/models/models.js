@@ -17,6 +17,10 @@ const sessionSchema = new mongoose.Schema({
   packStatus: { type: String, enum: ["curated", "generated"], required: true },
   createdAt: { type: Date, default: Date.now },
   skippedDiagnosis: { type: Boolean, default: false },
+  // Which questions the student has answered or skipped. One field, because a skipped question
+  // leaves no evidence behind yet must not be asked again: the claim is what records it, and the
+  // atomic claim is also what stops a double submit from being graded twice.
+  answeredQuestionIds: { type: [String], default: [] },
   goal: { type: String, default: "" }, // course | assignment | exam | curiosity (from the entry question)
 });
 
