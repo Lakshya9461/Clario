@@ -118,7 +118,10 @@ function questionIdFromPrompt(text) {
 function makeFakeLlm(options = {}) {
   const log = [];
   const fn = async (messages) => {
-    const text = messages.map((message) => message.content).join("\n");
+    // The stub answers the last user turn, which is the prompt it is replying to. Reading the
+    // whole list would also read the system prompt, where the shared data notice names every tag
+    // (including `<options>`), and the option parser below would find the wrong block.
+    const text = messages.at(-1).content;
     const kind = text.includes('"answerIndex"')
       ? "selfcheck"
       : text.includes('"diagnostic"')
