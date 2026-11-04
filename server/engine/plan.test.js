@@ -83,6 +83,7 @@ test("findings report the derived status, never a status the model chose", () =>
   const second = findings.find((finding) => finding.conceptId === "part_2");
   assert.equal(first.status, "demonstrated");
   assert.equal(first.certainty, "demonstrated");
+  assert.equal(first.title, "Part 1", "a finding names its concept without a step to look it up in");
   assert.equal(second.status, "unknown");
   assert.equal(second.certainty, null);
   assert.equal(second.why, "No answers yet.");

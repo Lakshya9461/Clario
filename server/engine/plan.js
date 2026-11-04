@@ -135,6 +135,9 @@ function planFindings(pack, events = []) {
     const estimate = byId.get(concept.id);
     return {
       conceptId: concept.id,
+      // The name travels with the finding because a finding is not always a step: a demonstrated
+      // concept is left out of the plan, and the client still has to name it.
+      title: concept.name,
       status: estimate.status,
       confidence: estimate.confidence,
       eventCount: estimate.eventCount,
