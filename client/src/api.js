@@ -1,0 +1,73 @@
+// The only place that talks to the server.
+//
+// Every failure is an ApiError carrying the server's own code and message, so a screen can say
+// what actually happened instead of "something went wrong". The API key never reaches this side:
+// the base URL is the only thing configured, and Vite bakes it in at build time.
+
+const BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:3000";
+
+export class ApiError extends Error {
+  constructor(message, { code = "request_failed", status = 0 } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+async function request(path, init) {
+  let response;
+  try {
+    response = await fetch(`${BASE}${path}`, init);
+  } catch {
+    throw new ApiError("Cannot reach the Clario server. Is it running?", { code: "network" });
+  }
+
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    // A proxy error page is not JSON, and the status still says what happened.
+  }
+
+  if (!response.ok) {
+    throw new ApiError(body?.message || `The server answered ${response.status}.`, {
+      code: body?.error,
+      status: response.status,
+    });
+  }
+  return body;
+}
+
+function post(path, body) {
+  return request(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function get(path) {
+  return request(path);
+}
+
+export const api = {
+  // A topic with no prepared pack answers 404 topic_not_available: this build never generates
+  // inside a request.
+  startSession: ({ topic, goal }) => post("/session", { topic, goal }),
+
+  diagnose: ({ sessionId, questionId, answer, skip = false }) =>
+    post("/diagnose", { sessionId, questionId, answer, skip }),
+
+  plan: (sessionId) => get(`/plan/${encodeURIComponent(sessionId)}`),
+
+  lesson: ({ sessionId, stepIndex }) => post("/lesson", { sessionId, stepIndex }),
+
+  // No questionId: the fetch mode that hands out the next check question.
+  nextCheckQuestion: (sessionId) => post("/check", { sessionId }),
+
+  check: ({ sessionId, questionId, answer, why = null }) =>
+    post("/check", { sessionId, questionId, answer, why }),
+
+  model: (sessionId) => get(`/model/${encodeURIComponent(sessionId)}`),
+};
