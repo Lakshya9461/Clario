@@ -1,9 +1,9 @@
-// Express app. Routes live here; index.js only starts the server.
-// Phase 0 has one endpoint: GET /health.
+// Express app. Routes live here and in routes.js; index.js only starts the server.
 
 const express = require("express");
 const cors = require("cors");
 const { toHttpError } = require("./errors");
+const { createRouter } = require("./routes");
 
 const app = express();
 
@@ -13,6 +13,8 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
+app.use(createRouter());
 
 app.use((req, res) => {
   res.status(404).json({
