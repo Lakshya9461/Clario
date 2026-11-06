@@ -7,7 +7,7 @@ must be run in each.
 ## Commands
 
 ```bash
-cd server && npm test          # node --test, every *.test.js (176 tests)
+cd server && npm test          # node --test, every *.test.js (184 tests)
 cd server && node --test packs/generate.test.js            # one file
 cd server && node --test --test-name-pattern "cached pack" # one test
 cd client && npm run lint      # oxlint; npm run build. The client has no test suite.
@@ -17,7 +17,9 @@ cd client && npm run dev       # http://localhost:5173
 
 Server tests need no network and no Mongo: the model is a stub and the store is a Map.
 `npm run smoke` and `npm run generate:preview` do need Strata (and Mongo);
-`PREVIEW_FRESH=1` forces a rerun past the cached packs.
+`PREVIEW_FRESH=1` forces a rerun past the cached packs. `npm run learners` needs a live
+API and Mongo, and `npm run teardown -- --yes` deletes every session, evidence event and
+generated pack.
 
 ## Gotchas
 
@@ -31,6 +33,10 @@ Server tests need no network and no Mongo: the model is a stub and the store is 
   not an optimization, it is the requirement. `LLM_TIMEOUT_MS` defaults to 90000.
 - `llm.js` runs 2 requests in flight and queues 3; past that it throws `LlmBusyError`,
   which the routes answer as 503 `{ error: "busy" }`. A busy queue is not `degraded`.
+- `server/rate-limit.js` allows 60 requests a minute per address and answers 429
+  `rate_limited` with a `Retry-After`; `/health` is mounted before it, so a monitor cannot
+  be limited. It reads `req.ip`, which is the client only because `app.js` sets
+  `trust proxy 1` and the deployment publishes nothing but the proxy.
 - Token caps and reasoning modes in the generation prompts are **measured against the real
   model**, not guessed (`server/scripts/bench-selfcheck.js`, `bench-topic-check.js`).
   Changing a cap without rerunning the benchmark can silently truncate replies.
