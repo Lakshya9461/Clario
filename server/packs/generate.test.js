@@ -634,3 +634,29 @@ test("the gate asks with thinking off, and a cached pack never re-asks it", asyn
   await generate({ llm: spied, store });
   assert.equal(options.length, 1, "the second run is served from the cache, so the gate must not run");
 });
+
+test("the concepts and questions drafts also ask for thinking off", async () => {
+  // Both drafting replies are large, and this model thinks by default: a thinking draft of the
+  // question list does not finish streaming inside the timeout, which fails the whole
+  // generation. The gate and self-check already pin this; the drafts must too.
+  const llm = makeFakeLlm();
+  const settingsByKind = new Map();
+  const spied = (messages, schema, fallback, settings) => {
+    const text = messages.at(-1).content;
+    const kind = text.includes('"supported"')
+      ? "topiccheck"
+      : text.includes('"answerIndex"')
+        ? "selfcheck"
+        : text.includes('"diagnostic"')
+          ? "questions"
+          : "concepts";
+    settingsByKind.set(kind, settings);
+    return llm(messages, schema, fallback, settings);
+  };
+
+  await generate({ llm: spied, store: memoryStore() });
+
+  for (const kind of ["concepts", "questions"]) {
+    assert.equal(settingsByKind.get(kind)?.reasoning, "off", `${kind} draft must ask for thinking off`);
+  }
+});

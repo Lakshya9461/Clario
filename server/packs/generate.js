@@ -531,9 +531,17 @@ async function topicSupported({ topic, chatJsonFn }) {
 }
 
 async function draftConcepts({ topic, goal, sources, chatJsonFn }) {
-  const value = await askJson(chatJsonFn, conceptsMessages({ topic, goal, sources }), conceptsResponseSchema, {
-    concepts: [],
-  });
+  // Thinking off, like the gate and the self-check: this model thinks by default, and a
+  // thinking draft of a dozen concepts can run past the stream timeout and lose the whole
+  // generation. Measured against the real server (scripts/bench-*.js pattern): off answers
+  // in ~13 s where the default takes ~60 s. No maxTokens cap — the reply is the whole list.
+  const value = await askJson(
+    chatJsonFn,
+    conceptsMessages({ topic, goal, sources }),
+    conceptsResponseSchema,
+    { concepts: [] },
+    { reasoning: "off" }
+  );
   if (!value) return null;
 
   const concepts = normalizeConcepts(value.concepts);
@@ -542,11 +550,16 @@ async function draftConcepts({ topic, goal, sources, chatJsonFn }) {
 }
 
 async function draftQuestions({ topic, goal, sources, concepts, conceptIds, chatJsonFn }) {
+  // Thinking off for the same reason as the concepts draft, and more so: this is the largest
+  // reply in the generation, and with the server's thinking default its stream does not
+  // finish inside the timeout at all — the run fails with generation_unavailable before any
+  // question exists. Off completes in about a minute with the full list.
   const value = await askJson(
     chatJsonFn,
     questionsMessages({ topic, goal, sources, concepts }),
     questionsResponseSchema,
-    { diagnostic: [], check: [] }
+    { diagnostic: [], check: [] },
+    { reasoning: "off" }
   );
   if (!value) return null;
 
