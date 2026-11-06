@@ -9,7 +9,8 @@
     "test": "node --test",
     "smoke": "node scripts/llm-smoke.js",
     "generate:preview": "node scripts/generate-preview.js",
-    "teardown": "node scripts/teardown.js"
+    "teardown": "node scripts/teardown.js",
+    "learners": "node scripts/three-learners.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

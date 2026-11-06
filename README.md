@@ -111,13 +111,27 @@ With source text the model is told to use only that text as its factual basis; w
 to use general knowledge and never invent a citation or URL.
 
 `npm run generate:preview` runs generation for five topics against Strata and Mongo
-(three real, one nonsense, one prompt-injection attempt) and prints, per topic: the time
-taken, the pack id and validator result, how many questions the self-check drafted and
-dropped, the concept graph, and three questions with their keys. It exits non-zero if a
-topic does not land where expected or if a pack echoes any of our own prompt text.
+(three real, one nonsense, one prompt-injection attempt — the gate must refuse the last two)
+and prints, per topic: the time taken, the pack id and validator result, how many questions
+the self-check drafted and dropped, the concept graph, and three questions with their keys.
+It exits non-zero if a topic does not land where expected or if a pack echoes any of our own
+prompt text.
+
+Two scripts exist for demo preparation and inspection:
+
+```bash
+cd server && npm run learners [apiUrl] [topic]   # three scripted learners, three plans
+cd server && npm run teardown -- --dry-run       # then --yes: wipe sessions, evidence, packs
+```
+
+`npm run learners` drives a live API over HTTP as a beginner, a partial and a strong
+learner and writes the raw responses to `~/.cache/tmp/opencode/clario-learners/`.
+`npm run teardown` deletes every session, evidence event and generated pack; it prints a
+redacted connection string, refuses to run without `MONGO_URL`, and needs `--yes` to delete.
 
 ## Status
 
-Phase 0 (repo + pack layout), Phase 1 (LLM client) and Phase 2 (draft pack generation).
-There are no HTTP routes beyond `GET /health` yet, so nothing calls the generator from the
-API.
+Phases 0–3. The API serves six routes plus `GET /health` (`docs/API_CONTRACT.md`): start a
+session on a prepared topic, diagnose, plan, lesson, check, summary. No route generates a
+pack — generation is the offline script above — so an unprepared topic is a 404. What the
+beta does not do is in `docs/LIMITATIONS.md`; how to deploy it is in `deploy/README.md`.
