@@ -11,6 +11,10 @@ Open <http://localhost:8080>. The proxy is the only published service. It serves
 client as an SPA and forwards `/api/...` to the API after removing `/api`. MongoDB stays
 on the Compose network and stores data in the `mongo_data` volume.
 
+That "proxy only" rule is what makes the API's per-address request limit meaningful: the
+API reads the client address from `X-Forwarded-For` (one trusted hop), so publishing the
+API port directly would let a caller pick its own address and step around the limit.
+
 The API reads `server/.env` when that file exists. Host environment values for
 `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` are passed through (set each one you need);
 other server settings can be placed in `server/.env`.
