@@ -49,12 +49,18 @@ const evidenceEventSchema = new mongoose.Schema({
 // A1: generated draft packs. Curated packs are JSON files in server/packs/ and never live
 // here. The whole pack is stored as validated JSON; topicKey is the cache key, so asking
 // for the same topic twice reuses one pack instead of regenerating it.
-const packSchema = new mongoose.Schema({
-  topicKey: { type: String, required: true, unique: true }, // normalized topic: trimmed, collapsed, lowercase
-  topic: { type: String, required: true },                  // the topic as the student asked for it
-  pack: { type: mongoose.Schema.Types.Mixed, required: true }, // validated pack JSON, status "generated"
-  createdAt: { type: Date, default: Date.now },
-});
+// minimize: false, because mongoose's default strips empty objects out of the Mixed pack on
+// save. "traces" is required by the validator and is {} for every generated pack, so the default
+// would store a pack that comes back out failing validatePack.
+const packSchema = new mongoose.Schema(
+  {
+    topicKey: { type: String, required: true, unique: true }, // normalized topic: trimmed, collapsed, lowercase
+    topic: { type: String, required: true },                  // the topic as the student asked for it
+    pack: { type: mongoose.Schema.Types.Mixed, required: true }, // validated pack JSON, status "generated"
+    createdAt: { type: Date, default: Date.now },
+  },
+  { minimize: false }
+);
 
 // Strongest first. The estimate reports the WEAKEST quality among the events it used.
 const EVIDENCE_QUALITY_STRENGTH = { code_keyed: 3, llm_keyed: 2, llm_graded: 1 };

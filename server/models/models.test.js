@@ -1,7 +1,7 @@
 // Unit tests for the derived estimate (A4). Run with: npm test
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { computeEstimate } = require("./models");
+const { computeEstimate, Pack } = require("./models");
 
 const concepts = [{ id: "c1" }, { id: "c2" }];
 
@@ -92,4 +92,11 @@ test("estimates are per concept", () => {
   const estimates = computeEstimate([event({ conceptId: "c2" })], concepts, "curated");
   assert.equal(estimates.find((e) => e.conceptId === "c1").status, "unknown");
   assert.equal(estimates.find((e) => e.conceptId === "c2").status, "developing");
+});
+
+// The pack that comes back out of Mongo is what the app serves, so it has to be the pack that
+// passed the validator. "traces" is a required record and is {} for every generated pack, and
+// mongoose's default minimize would strip it on save -- hence the schema option, pinned here.
+test("the pack schema keeps empty objects so traces survives a save", () => {
+  assert.equal(Pack.schema.options.minimize, false);
 });
