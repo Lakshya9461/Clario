@@ -4,7 +4,10 @@
 // what actually happened instead of "something went wrong". The API key never reaches this side:
 // the base URL is the only thing configured, and Vite bakes it in at build time.
 
-const BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:3000";
+// An empty or relative VITE_API_URL means "same origin": the production proxy serves the built
+// client and the API from one host, so the path goes to the same place. Unset keeps the dev
+// default, where the client and the server run on different ports.
+const BASE = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:3000";
 
 export class ApiError extends Error {
   constructor(message, { code = "request_failed", status = 0 } = {}) {
