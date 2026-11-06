@@ -114,6 +114,20 @@ h3 {
   padding-top: 1.5rem;
 }
 
+/* The short notice that follows a student through the flow, so it is never only on the first
+   screen that they might have scrolled past. */
+.foot {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.foot__text {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
 /* ---------- start ---------- */
 
 .start {
@@ -139,6 +153,31 @@ h3 {
 
 .start__note {
   margin-top: 2rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.start__badge {
+  margin: 0 0 0.75rem;
+}
+
+/* What the beta keeps. Set apart from the note above it, because it is the one paragraph on the
+   start screen a student may come back to read. */
+.data-notice {
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.data-notice__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.data-notice__body {
+  margin: 0;
   font-size: 0.85rem;
   color: var(--ink-soft);
 }
@@ -260,6 +299,15 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* The beta marker: it must read on the first screen and on every later one, so it carries the
+   accent colour rather than the muted one. */
+.tag--beta {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .code {

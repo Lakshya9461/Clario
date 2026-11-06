@@ -8,6 +8,7 @@ import { useState } from "react";
 import { api } from "../api.js";
 import Notice from "../components/Notice.jsx";
 import { GOALS } from "../labels.js";
+import { DATA_NOTICE } from "../privacy.js";
 
 export default function Start({ onStarted }) {
   const [topic, setTopic] = useState("");
@@ -34,6 +35,9 @@ export default function Start({ onStarted }) {
 
   return (
     <main className="start">
+      <p className="start__badge">
+        <span className="tag tag--beta">Beta</span>
+      </p>
       <h1 className="start__title">Clario</h1>
       <p className="start__lede">
         Adaptive practice for any topic. Answer a few questions, get a plan built from what you
@@ -76,6 +80,13 @@ export default function Start({ onStarted }) {
         This beta serves topics that have already been prepared. If a topic is not available yet,
         the server says so instead of inventing it.
       </p>
+
+      <section className="data-notice" aria-labelledby="data-notice-title">
+        <h2 className="data-notice__title" id="data-notice-title">
+          What this beta stores
+        </h2>
+        <p className="data-notice__body">{DATA_NOTICE}</p>
+      </section>
     </main>
   );
 }

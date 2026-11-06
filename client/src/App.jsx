@@ -13,6 +13,7 @@ import Check from "./screens/Check.jsx";
 import Summary from "./screens/Summary.jsx";
 import Notice from "./components/Notice.jsx";
 import { forgetLoaded } from "./useLoad.js";
+import { DATA_NOTICE_SHORT } from "./privacy.js";
 
 // There are no accounts: the session id in localStorage is the only thing this browser keeps, and
 // the server is the record of everything else. A reload starts a new session.
@@ -60,6 +61,7 @@ export default function App() {
         <button type="button" className="top__brand" onClick={restart}>
           Clario
         </button>
+        <span className="tag tag--beta">Beta</span>
         <p className="top__topic">{session.topic}</p>
         <ol className="progress" aria-label="Progress">
           {STAGES.map((name, index) => (
@@ -110,6 +112,10 @@ export default function App() {
 
         {phase === "summary" ? <Summary session={session} onRestart={restart} /> : null}
       </main>
+
+      <footer className="foot">
+        <p className="foot__text">{DATA_NOTICE_SHORT}</p>
+      </footer>
     </div>
   );
 }
