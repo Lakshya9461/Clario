@@ -122,11 +122,13 @@ function makeFakeLlm(options = {}) {
     // whole list would also read the system prompt, where the shared data notice names every tag
     // (including `<options>`), and the option parser below would find the wrong block.
     const text = messages.at(-1).content;
-    const kind = text.includes('"answerIndex"')
-      ? "selfcheck"
-      : text.includes('"diagnostic"')
-        ? "questions"
-        : "concepts";
+    const kind = text.includes('"supported"')
+      ? "topiccheck"
+      : text.includes('"answerIndex"')
+        ? "selfcheck"
+        : text.includes('"diagnostic"')
+          ? "questions"
+          : "concepts";
     const attempt = log.filter((call) => call.kind === kind).length;
     log.push({ kind, attempt, messages });
 
@@ -134,6 +136,13 @@ function makeFakeLlm(options = {}) {
       return { value: null, degraded: true, reason: "unavailable" };
     }
 
+    if (kind === "topiccheck") {
+      // `unusable` makes the reply fail validation, which is the "failed check" path.
+      if (options.topicCheck === "unusable") {
+        return { value: { supported: "maybe" }, degraded: true, reason: "invalid" };
+      }
+      return { value: { supported: options.supported ?? true }, degraded: false };
+    }
     if (kind === "concepts") {
       const concepts = options.concepts ? options.concepts(attempt) : conceptFixture();
       return { value: { concepts }, degraded: false };
@@ -561,9 +570,67 @@ test("accepts a topic of exactly 120 characters", async () => {
   assert.equal(pack.topic.length, 120);
 });
 
-test("prompts exist for all three steps", () => {
+test("prompts exist for every step", () => {
   const messages = prompts.conceptsMessages({ topic: "t", goal: "exam", sources: [] });
   assert.equal(messages.length, 2);
   assert.ok(prompts.questionsMessages({ topic: "t", goal: "exam", sources: [], concepts: conceptFixture() }).length === 2);
   assert.ok(prompts.selfCheckMessages({ question: mcq("x1", 1) }).length === 2);
+  assert.ok(prompts.topicCheckMessages({ topic: "t" }).length === 2);
+});
+
+// --- the topic gate ------------------------------------------------------
+//
+// Generation is minutes of work, so a phrase that names no subject is refused before any of it
+// starts. These four tests are the whole contract of the gate.
+
+test("a topic the check rejects is refused before anything is drafted", async () => {
+  const llm = makeFakeLlm({ supported: false });
+  const store = memoryStore();
+
+  await assert.rejects(generate({ llm, store }), (error) => {
+    assert.ok(error instanceof TopicNotSupportedError);
+    assert.equal(error.code, "topic_not_supported");
+    assert.equal(error.status, 422);
+    assert.match(error.message, /subject/i, "the refusal must say what to do differently");
+    return true;
+  });
+
+  assert.equal(llm.count("topiccheck"), 1, "the gate is one call");
+  assert.equal(llm.count("concepts"), 0, "no drafting may happen after the gate refuses");
+  assert.equal(llm.count("questions"), 0);
+  assert.equal(store.saved.size, 0, "a refused topic must not be stored");
+});
+
+test("an unusable check reply is a refusal, not a silently accepted topic", async () => {
+  const llm = makeFakeLlm({ topicCheck: "unusable" });
+  await assert.rejects(generate({ llm, store: memoryStore() }), (error) => error.code === "topic_not_supported");
+  assert.equal(llm.count("concepts"), 0);
+});
+
+test("an unreachable model during the gate is generation_unavailable, not a bad topic", async () => {
+  const llm = makeFakeLlm({ unavailable: "topiccheck" });
+  await assert.rejects(generate({ llm, store: memoryStore() }), (error) => {
+    assert.ok(error instanceof GenerationUnavailableError);
+    assert.equal(error.code, "generation_unavailable");
+    assert.equal(error.status, 503);
+    return true;
+  });
+});
+
+test("the gate asks with thinking off, and a cached pack never re-asks it", async () => {
+  const llm = makeFakeLlm();
+  const store = memoryStore();
+  const options = [];
+  const spied = (messages, schema, fallback, settings) => {
+    if (messages.at(-1).content.includes('"supported"')) options.push(settings);
+    return llm(messages, schema, fallback, settings);
+  };
+
+  await generate({ llm: spied, store });
+  assert.equal(options.length, 1);
+  assert.equal(options[0].reasoning, "off");
+  assert.ok(options[0].maxTokens <= 32, `the gate cap is ${options[0].maxTokens}, expected at most 32`);
+
+  await generate({ llm: spied, store });
+  assert.equal(options.length, 1, "the second run is served from the cache, so the gate must not run");
 });

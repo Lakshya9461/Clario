@@ -97,6 +97,33 @@ const SELF_CHECK_SYSTEM = [
   "Answer from your own knowledge of the subject. If you are unsure, still pick the single best index.",
 ].join("\n");
 
+// The cheapest question we can ask before spending minutes on a pack: is this a subject at all?
+// Generation is the only expensive path in the beta, and a phrase that names nothing would burn
+// five minutes to end in topic_not_supported anyway.
+const TOPIC_CHECK_SYSTEM = [
+  "You decide whether a phrase names a subject that can be taught and quizzed. Reply with one JSON object and nothing else: no prose, no markdown fences.",
+  DATA_NOTICE,
+  "supported=true when the phrase names a real, learnable subject: an academic subject, a skill, a technique, a tool, a work, or a body of knowledge.",
+  "supported=false when it is nonsense or random characters, a bare instruction or question, a request about you or this app, or so vague that it names no single subject.",
+  "Do not judge fame, level or difficulty: an unusual or very narrow subject is still true if a person could study it.",
+  "When the phrase is ambiguous, answer true. Rejecting a real subject is worse than attempting it.",
+].join("\n");
+
+function topicCheckMessages({ topic }) {
+  return [
+    { role: "system", content: TOPIC_CHECK_SYSTEM },
+    {
+      role: "user",
+      content: [
+        `<topic>${asData(topic)}</topic>`,
+        "",
+        "Does this name a subject a person could study?",
+        'Reply as {"supported": true} or {"supported": false}.',
+      ].join("\n"),
+    },
+  ];
+}
+
 function sourceBlock(sources) {
   if (!sources.length) {
     return (
@@ -178,7 +205,7 @@ function selfCheckMessages({ question }) {
   ];
 }
 
-const prompts = { conceptsMessages, questionsMessages, selfCheckMessages };
+const prompts = { conceptsMessages, questionsMessages, selfCheckMessages, topicCheckMessages };
 
 // ---------------------------------------------------------------------------
 // Schemas (rule 2: every LLM reply is zod-validated)
@@ -221,6 +248,10 @@ const questionsResponseSchema = z.object({
 });
 
 const selfCheckResponseSchema = z.object({ answerIndex: z.number().int().min(0).max(3) });
+
+// One boolean back, so the cap only has to cover `{"supported": true}`. Measured like the
+// self-check cap: see scripts/bench-topic-check.js.
+const topicCheckResponseSchema = z.object({ supported: z.boolean() });
 
 // ---------------------------------------------------------------------------
 // Normalization and structural checks
@@ -463,6 +494,15 @@ const mongoStore = {
 // would eat the cap and the question would be dropped, so this is measured, not guessed.
 const SELF_CHECK_MAX_TOKENS = 64;
 
+// The topic check answers one boolean, so its cap is smaller still. Measured the same way, with
+// scripts/bench-topic-check.js: the cap is what a wrong answer would have to fit in, so it is
+// checked against the real server rather than assumed.
+const TOPIC_CHECK_MAX_TOKENS = 32;
+
+const TOPIC_CHECK_MESSAGE =
+  "That does not look like a subject we can build a study pack for. Name a subject, skill or " +
+  "technique — something a person could study or practise.";
+
 // One validated LLM reply. null means the reply was unusable, which a retry may fix.
 // "Could not reach the model" is thrown instead: that is a broken dependency, not a bad topic.
 async function askJson(chatJsonFn, messages, schema, fallback, options = {}) {
@@ -473,6 +513,21 @@ async function askJson(chatJsonFn, messages, schema, fallback, options = {}) {
   if (!degraded) return value;
   if (reason === "unavailable") throw new GenerationUnavailableError();
   return null;
+}
+
+// The gate before any drafting: one call, thinking off, one boolean back. A phrase that names no
+// subject is refused here rather than five minutes into a generation run. An unusable reply is a
+// refusal too (the reply is the whole evidence we have), but an unreachable model is not: that is
+// a broken dependency and askJson throws GenerationUnavailableError for it.
+async function topicSupported({ topic, chatJsonFn }) {
+  const value = await askJson(
+    chatJsonFn,
+    topicCheckMessages({ topic }),
+    topicCheckResponseSchema,
+    { supported: false },
+    { reasoning: "off", maxTokens: TOPIC_CHECK_MAX_TOKENS }
+  );
+  return value !== null && value.supported === true;
 }
 
 async function draftConcepts({ topic, goal, sources, chatJsonFn }) {
@@ -591,6 +646,12 @@ async function generatePack({ topic, goal = "", sourceChunks = [], deps = {} } =
   const sources = toSources(sourceChunks);
   const studentGoal = String(goal || "").slice(0, 40);
 
+  // Step 0. Is this a subject at all? One cheap call, before anything is drafted. A pack that
+  // already exists was returned above, so an existing topic is never re-gated.
+  if (!(await topicSupported({ topic: normalizedTopic, chatJsonFn }))) {
+    throw new TopicNotSupportedError(TOPIC_CHECK_MESSAGE);
+  }
+
   // Step 1 + 2. Concepts, then the Phase 0 validator. One retry, then give up.
   let concepts = null;
   for (let attempt = 1; attempt <= 2 && !concepts; attempt += 1) {
@@ -664,6 +725,10 @@ module.exports = {
   mapWithLimit,
   SELF_CHECK_BATCH,
   SELF_CHECK_MAX_TOKENS,
+  // Exported for scripts/bench-topic-check.js, for the same reason.
+  topicSupported,
+  topicCheckResponseSchema,
+  TOPIC_CHECK_MAX_TOKENS,
   TopicNotSupportedError,
   InvalidTopicError,
   GenerationUnavailableError,
