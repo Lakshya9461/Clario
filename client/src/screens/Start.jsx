@@ -78,7 +78,9 @@ export default function Start({ onStarted }) {
 
       <p className="start__note">
         This beta serves topics that have already been prepared. If a topic is not available yet,
-        the server says so instead of inventing it.
+        the server says so instead of inventing it. Prepared material can be assistant-written and
+        unreviewed, so anything the app says is generated and unverified unless a lesson cites a
+        source.
       </p>
 
       <section className="data-notice" aria-labelledby="data-notice-title">
