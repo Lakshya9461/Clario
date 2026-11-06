@@ -52,10 +52,14 @@ verified against the code, with the file that causes it.
 - **What is stored:** the topic, the goal text (40 characters max), which questions were answered,
   and one evidence event per concept per answer (with a short note). Not stored: names, emails,
   IPs, or the answer text itself.
-- **No rate limiting.** The server caps the JSON body at 1 MB (`app.js`) and each answer at 4000
-  characters (`routes.js`), and the LLM queue refuses work past 2 in flight plus 3 waiting
-  (`503 busy`), which is the only back-pressure there is. There is no per-IP or per-session limit,
-  so a public deployment can be hammered. Put a proxy limit in front before exposing it.
+- **The only rate limit is one crude per-address window.** 60 requests a minute per address, over
+  the whole API, swept in memory (`server/rate-limit.js`); past it the answer is `429
+  rate_limited` with a `Retry-After`. That is enough to stop one script burning the model queue,
+  and not enough to stop a determined one: the count is per address (a campus behind one NAT
+  shares an allowance, which is why the limit is generous), it is fixed-window rather than
+  smoothed, and the address comes from `X-Forwarded-For`, so it is only as honest as the proxy in
+  front. The JSON body is capped at 1 MB (`app.js`) and each answer at 4000 characters
+  (`routes.js`). For a real deployment, put a proxy-side limit in front as well.
 - **Prompt injection is contained, not solved.** Student and source text is wrapped in tags and
   declared data (`server/data-tags.js`), and closing tags are escaped everywhere a string enters a
   prompt (topic, goal, answer, why, source text). A model can still be talked into nonsense
