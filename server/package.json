@@ -8,7 +8,8 @@
     "start": "node index.js",
     "test": "node --test",
     "smoke": "node scripts/llm-smoke.js",
-    "generate:preview": "node scripts/generate-preview.js"
+    "generate:preview": "node scripts/generate-preview.js",
+    "teardown": "node scripts/teardown.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
