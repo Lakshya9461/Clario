@@ -1,0 +1,39 @@
+services:
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    env_file:
+      - path: ./server/.env
+        required: false
+    environment:
+      MONGO_URL: mongodb://mongo:27017/clario
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:8080}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    depends_on:
+      mongo:
+        condition: service_started
+
+  mongo:
+    image: mongo:8
+    volumes:
+      - mongo_data:/data/db
+
+  proxy:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      args:
+        VITE_API_URL: /api
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  mongo_data:
