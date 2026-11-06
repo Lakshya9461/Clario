@@ -226,6 +226,58 @@ test("an empty answer is refused before anything is recorded", async () => {
   }
 });
 
+// A student text that goes into a prompt is bounded at the trust boundary: an unbounded one is a
+// cost and an injection surface. The cap is far above a real answer, so only a pasted document
+// is refused, and it is refused before the question is claimed or graded.
+test("an answer over the cap is refused before the question is claimed", async () => {
+  const harness = await setup();
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic" });
+    const { status, body } = await harness.post("/diagnose", {
+      sessionId: started.sessionId,
+      questionId: "d1",
+      answer: "x".repeat(4001),
+    });
+
+    assert.equal(status, 400);
+    assert.equal(body.error, "answer_too_long");
+    assert.match(body.message, /4000/, "the message has to say what the limit is");
+    assert.equal(harness.chat.calls.length, 0, "no model call for a refused answer");
+    assert.equal(harness.events.length, 0);
+    assert.equal(harness.session.answeredQuestionIds.length, 0, "the question is still askable");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("an explanation over the cap is refused too, and an answer at the cap is accepted", async () => {
+  const harness = await setup();
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic" });
+
+    const tooLong = await harness.post("/check", {
+      sessionId: started.sessionId,
+      questionId: "c2",
+      answer: "the answer",
+      why: "y".repeat(4001),
+    });
+    assert.equal(tooLong.status, 400);
+    assert.equal(tooLong.body.error, "answer_too_long");
+    assert.equal(harness.session.answeredQuestionIds.length, 0, "nothing was claimed");
+
+    const atCap = await harness.post("/check", {
+      sessionId: started.sessionId,
+      questionId: "c2",
+      answer: "z".repeat(4000),
+      why: "because the rubric is met",
+    });
+    assert.equal(atCap.status, 200);
+    assert.equal(harness.session.answeredQuestionIds.length, 1);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("a question from another list is refused", async () => {
   const harness = await setup();
   try {

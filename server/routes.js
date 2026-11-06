@@ -14,6 +14,8 @@ const { EvidenceEvent, computeEstimate } = require("./models/models");
 const { chatJson } = require("./llm");
 const {
   InvalidAnswerError,
+  AnswerTooLongError,
+  MAX_ANSWER_LENGTH,
   QuestionAlreadyAnsweredError,
   SourceTextNotSupportedError,
   claimQuestion,
@@ -61,9 +63,18 @@ function answersWith(session, questionId) {
   return Array.from(new Set([...(session.answeredQuestionIds || []), questionId]));
 }
 
+// Student text that goes into a prompt is bounded here, at the trust boundary. The answer is
+// required; the explanation is optional and shares the same cap.
+function boundedText(value) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (text.length > MAX_ANSWER_LENGTH) throw new AnswerTooLongError();
+  return text;
+}
+
 function requireAnswer(answer) {
-  if (typeof answer !== "string" || !answer.trim()) throw new InvalidAnswerError();
-  return answer;
+  const text = boundedText(answer);
+  if (!text) throw new InvalidAnswerError();
+  return text;
 }
 
 // A keyed question is graded in code, exactly. Everything else is graded by the model, which may
@@ -115,13 +126,13 @@ function createRouter(overrides = {}) {
     const { session, pack } = await loadSession({ sessionId, deps });
     const question = findQuestion(pack, "diagnostic", questionId);
     const isSkip = skip === true;
-    if (!isSkip) requireAnswer(answer);
+    const answerText = isSkip ? "" : requireAnswer(answer);
 
     const claimed = await claimQuestion({ session, questionId, skipped: isSkip, deps });
     if (!claimed) throw new QuestionAlreadyAnsweredError();
 
     if (!isSkip) {
-      const { events } = await gradeAnswer({ question, answer, why: "", pack, deps });
+      const { events } = await gradeAnswer({ question, answer: answerText, why: "", pack, deps });
       await appendEvents({ sessionId: String(session._id), pack, events, deps });
     }
 
@@ -192,16 +203,16 @@ function createRouter(overrides = {}) {
 
     const question = findQuestion(pack, "check", questionId);
 
-    requireAnswer(answer);
-    const explanation = typeof why === "string" ? why : "";
+    const answerText = requireAnswer(answer);
+    const explanation = boundedText(why);
 
     const claimed = await claimQuestion({ session, questionId, deps });
     if (!claimed) throw new QuestionAlreadyAnsweredError();
 
-    const graded = await gradeAnswer({ question, answer, why: explanation, pack, deps });
+    const graded = await gradeAnswer({ question, answer: answerText, why: explanation, pack, deps });
     const feedback = await writeFeedback({
       question,
-      answer,
+      answer: answerText,
       why: explanation,
       correct: graded.correct,
       chatJsonFn: deps.chatJson,

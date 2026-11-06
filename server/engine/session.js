@@ -71,6 +71,21 @@ class InvalidAnswerError extends Error {
   }
 }
 
+// A written answer goes into the model prompt whole, so an unbounded one is a cost and an
+// injection surface at the same time. The cap is well above any answer a student would write for
+// one question, so a real answer is never refused — only a paste of a whole document.
+const MAX_ANSWER_LENGTH = 4000;
+
+class AnswerTooLongError extends Error {
+  constructor(message = `That answer is longer than ${MAX_ANSWER_LENGTH} characters. Write a shorter one.`) {
+    super(message);
+    this.name = "AnswerTooLongError";
+    this.status = 400;
+    this.code = "answer_too_long";
+    this.expose = true;
+  }
+}
+
 // A pasted source cannot be honoured: it would need a pack generated from it, and a request may
 // not wait minutes for that. Saying so is better than ignoring the paste and answering from
 // general knowledge while the student believes their own text was used.
@@ -283,6 +298,8 @@ module.exports = {
   QuestionNotFoundError,
   QuestionAlreadyAnsweredError,
   InvalidAnswerError,
+  AnswerTooLongError,
+  MAX_ANSWER_LENGTH,
   SourceTextNotSupportedError,
   resolvePack,
   packForSession,
