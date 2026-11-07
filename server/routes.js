@@ -10,7 +10,7 @@
 // a fake model; production passes nothing and gets Mongoose and llm.js.
 
 const express = require("express");
-const { EvidenceEvent, computeEstimate } = require("./models/models");
+const { EvidenceEvent, Pack, computeEstimate } = require("./models/models");
 const { chatJson } = require("./llm");
 const {
   InvalidAnswerError,
@@ -25,6 +25,7 @@ const {
   diagnosisComplete,
   findQuestion,
   loadSession,
+  listTopics,
   nextCheckQuestion,
   nextDiagnosticQuestion,
   publicQuestion,
@@ -39,6 +40,7 @@ const defaultDeps = {
   findEvents: (sessionId) => EvidenceEvent.find({ sessionId }).lean(),
   countEvents: (sessionId) => EvidenceEvent.countDocuments({ sessionId }),
   insertEvents: (documents) => EvidenceEvent.insertMany(documents),
+  listStored: () => Pack.find({}).lean(),
 };
 
 // Evidence is append-only, and an event may only name a concept of the pack it belongs to:
@@ -62,6 +64,22 @@ async function appendEvents({ sessionId, pack, events, deps }) {
 // A Set because counting the same id twice would end a 3-question diagnostic after two answers.
 function answersWith(session, questionId) {
   return Array.from(new Set([...(session.answeredQuestionIds || []), questionId]));
+}
+
+// One place that turns the append-only evidence into the per-concept view both /model and /lesson
+// read, so a lesson is pitched from exactly what the learner model shows. The estimate is always
+// recomputed here and never read from the store.
+function learnerByConcept({ pack, events }) {
+  return computeEstimate(events, pack.concepts, pack.status).map((estimate) => ({
+    ...estimate,
+    name: pack.concepts.find((entry) => entry.id === estimate.conceptId)?.name ?? "",
+    // "unknown" is unassessed, never a weakness: it comes with no notes. The last three are the
+    // most recent thing the student showed.
+    notes: events
+      .filter((event) => String(event.conceptId) === estimate.conceptId && event.note)
+      .slice(-3)
+      .map((event) => event.note),
+  }));
 }
 
 // Student text that goes into a prompt is bounded here, at the trust boundary. The answer is
@@ -111,6 +129,12 @@ async function gradeAnswer({ question, answer, why, pack, deps }) {
 function createRouter(overrides = {}) {
   const deps = { ...defaultDeps, ...overrides };
   const router = express.Router();
+
+  // What a student can start, so the client can offer the prepared topics instead of leaving them
+  // to guess. Reading pack files and one small collection is cheap; nothing here calls the model.
+  router.get("/topics", async (req, res) => {
+    res.json({ topics: await listTopics(deps) });
+  });
 
   // A3 + the offline-generation rule: a session runs on a pack that already exists. A pasted
   // source would need generation, so it is refused rather than quietly ignored.
@@ -188,7 +212,17 @@ function createRouter(overrides = {}) {
     const step = stepAt(planSteps(pack, events), stepIndex);
     const concept = pack.concepts.find((entry) => entry.id === step.conceptId);
 
-    const lesson = await buildLesson({ pack, concept, chatJsonFn: deps.chatJson });
+    // A lesson is pitched from the same view of the concept that /model shows: why the student is
+    // studying (session.goal) and what the evidence already says. Both are data, not instructions.
+    const learner = learnerByConcept({ pack, events }).find((entry) => entry.conceptId === concept.id);
+    const lesson = await buildLesson({
+      pack,
+      concept,
+      goal: session.goal,
+      status: learner ? learner.status : null,
+      notes: learner ? learner.notes : [],
+      chatJsonFn: deps.chatJson,
+    });
     res.json({
       conceptId: concept.id,
       stepIndex,
@@ -266,24 +300,16 @@ function createRouter(overrides = {}) {
   router.get("/model/:sessionId", async (req, res) => {
     const { session, pack } = await loadSession({ sessionId: req.params.sessionId, deps });
     const events = await deps.findEvents(String(session._id));
-    const estimates = computeEstimate(events, pack.concepts, pack.status);
 
     res.json({
-      concepts: estimates.map((estimate) => {
-        const concept = pack.concepts.find((entry) => entry.id === estimate.conceptId);
-        return {
-          id: estimate.conceptId,
-          name: concept.name,
-          status: estimate.status,
-          confidence: estimate.confidence,
-          eventCount: estimate.eventCount,
-          // "unknown" is unassessed, never a weakness: it comes with no notes.
-          notes: events
-            .filter((event) => String(event.conceptId) === estimate.conceptId && event.note)
-            .slice(-3)
-            .map((event) => event.note),
-        };
-      }),
+      concepts: learnerByConcept({ pack, events }).map((estimate) => ({
+        id: estimate.conceptId,
+        name: estimate.name,
+        status: estimate.status,
+        confidence: estimate.confidence,
+        eventCount: estimate.eventCount,
+        notes: estimate.notes,
+      })),
       lowEvidence: Boolean(session.skippedDiagnosis),
     });
   });

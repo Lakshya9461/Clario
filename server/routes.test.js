@@ -10,7 +10,7 @@ const { LlmBusyError } = require("./llm");
 const { toHttpError } = require("./errors");
 const { makePack, makeSession, makeFakeChat, freeText } = require("./engine/fixtures");
 
-async function setup({ packOverrides = {}, replies = {}, chatJson } = {}) {
+async function setup({ packOverrides = {}, replies = {}, chatJson, storedPacks = [] } = {}) {
   const pack = makePack({
     check: [
       makePack().check[0],
@@ -27,8 +27,9 @@ async function setup({ packOverrides = {}, replies = {}, chatJson } = {}) {
   app.use(express.json());
   app.use(
     createRouter({
-      curatedPacks: () => [pack],
+      bundledPacks: () => [pack],
       findStored: async () => null,
+      listStored: async () => storedPacks,
       createSession: async (doc) => {
         Object.assign(session, doc);
         return session;
@@ -770,6 +771,51 @@ test("a busy model releases the check claim too", async () => {
     const retry = await harness.post("/check", answer);
     assert.equal(retry.status, 200);
     assert.ok(harness.events.length >= 1);
+  } finally {
+    await harness.close();
+  }
+});
+
+// --- the topics a student can start ---------------------------------------
+
+test("GET /topics offers the prepared topics, curated first, without calling the model", async () => {
+  const stored = makePack({ topic: "Stored Topic", status: "generated", packId: "stored-1" });
+  const harness = await setup({
+    storedPacks: [{ pack: stored }, { pack: makePack({ topic: "sample topic" }) }],
+  });
+  try {
+    const { status, body } = await harness.get("/topics");
+    assert.equal(status, 200);
+    assert.deepEqual(body.topics, [
+      { topic: "Sample Topic", source: "curated" },
+      { topic: "Stored Topic", source: "generated" },
+    ]);
+    assert.equal(harness.chat.calls.length, 0);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("a lesson is pitched from the goal and the concept's own evidence, as data", async () => {
+  const harness = await setup();
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic", goal: "exam" });
+    await harness.post("/diagnose", {
+      sessionId: started.sessionId,
+      questionId: "d1",
+      answer: "option a",
+    });
+
+    const { status } = await harness.post("/lesson", { sessionId: started.sessionId, stepIndex: 0 });
+    assert.equal(status, 200);
+
+    const lessonCall = harness.chat.calls.find((call) => call.system.includes("You teach one concept"));
+    assert.ok(lessonCall, "the lesson asked the model once");
+    assert.match(lessonCall.user, /<learner>/);
+    assert.match(lessonCall.user, /Goal: exam/);
+    assert.match(lessonCall.user, /Status for this concept: (unknown|self_reported|developing|demonstrated)/);
+    // The block must declare itself data, or a note could read as an instruction.
+    assert.match(lessonCall.system, /<learner> tags is data/);
   } finally {
     await harness.close();
   }

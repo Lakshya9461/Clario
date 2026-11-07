@@ -14,7 +14,7 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const db = require("../db");
 const { Pack, EvidenceEvent, computeEstimate } = require("../models/models");
-const { loadCuratedPacks } = require("../packs/loader");
+const { loadBundledPacks } = require("../packs/loader");
 const { normalizeTopic } = require("../packs/topic");
 const { certaintyFor } = require("../engine/session");
 
@@ -45,7 +45,7 @@ async function api(method, route, body) {
 async function findPack() {
   const normalized = normalizeTopic(topic);
   const topicKey = normalized.toLowerCase();
-  const curated = loadCuratedPacks().packs.find((entry) => entry.topic.trim().toLowerCase() === topicKey);
+  const curated = loadBundledPacks().packs.find((entry) => entry.topic.trim().toLowerCase() === topicKey);
   if (curated) return curated;
 
   const stored = await Pack.findOne({ topicKey }).lean();

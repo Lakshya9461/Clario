@@ -1,7 +1,10 @@
 // Unit tests for the pack validator. Run with: npm test  (node --test)
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { validatePack, loadCuratedPacks, findPackByTopic } = require("./loader");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { validatePack, loadBundledPacks, findPackByTopic } = require("./loader");
 
 function concept(id, prerequisites = []) {
   return { id, name: id, description: `Description of ${id}`, prerequisites };
@@ -133,15 +136,31 @@ test("rejects predict_output in a generated pack", () => {
   assert.ok(errors.some((e) => e.includes('may only use "mcq" and "free_text"')), errors.join("; "));
 });
 
-test("validates the curated sample pack", () => {
-  const { packs, errors } = loadCuratedPacks();
+test("validates every bundled pack", () => {
+  const { packs, errors } = loadBundledPacks();
+  assert.deepEqual(errors, []);
+  assert.ok(packs.some((pack) => pack.status === "curated"), "the curated pack still ships");
+});
+
+test("a bundled generated pack is served with its own status", () => {
+  // A reviewed generated pack can be committed so a fresh server has something to demo. Its status
+  // is what A4 reads, so it must survive the trip through the file.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clario-packs-"));
+  const pack = validPack();
+  pack.status = "generated";
+  // A generated pack may only use mcq and free_text, so drop the traced predict_output question.
+  pack.check = [pack.check[0]];
+  fs.writeFileSync(path.join(dir, "demo.json"), JSON.stringify(pack));
+
+  const { packs, errors } = loadBundledPacks(dir);
   assert.deepEqual(errors, []);
   assert.equal(packs.length, 1);
-  assert.equal(packs[0].status, "curated");
+  assert.equal(packs[0].status, "generated");
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("finds a curated pack by topic, case-insensitively", () => {
-  const { packs } = loadCuratedPacks();
+  const { packs } = loadBundledPacks();
   const pack = packs[0];
   assert.equal(findPackByTopic(pack.topic.toUpperCase(), packs), pack);
   assert.equal(findPackByTopic(`  ${pack.topic}  `, packs), pack);

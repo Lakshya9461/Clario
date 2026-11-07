@@ -8,6 +8,7 @@ const {
   SessionNotFoundError,
   QuestionNotFoundError,
   resolvePack,
+  listTopics,
   packForSession,
   createSession,
   loadSession,
@@ -133,21 +134,21 @@ test("only a curated, code-keyed demonstration is stated as demonstrated", () =>
 
 test("a curated pack is matched by topic, ignoring case and spacing", async () => {
   const pack = makePack();
-  const deps = { curatedPacks: () => [pack], findStored: async () => null };
+  const deps = { bundledPacks: () => [pack], findStored: async () => null };
   assert.equal((await resolvePack("  sample   TOPIC ", deps)).packId, "sample-1");
 });
 
 test("a stored generated pack is the fallback when no curated pack matches", async () => {
   const pack = makePack({ status: "generated", packId: "generated-1" });
   const deps = {
-    curatedPacks: () => [],
+    bundledPacks: () => [],
     findStored: async (topicKey) => (topicKey === "sample topic" ? { pack } : null),
   };
   assert.equal((await resolvePack("Sample Topic", deps)).packId, "generated-1");
 });
 
 test("a topic with no pack is refused, not generated", async () => {
-  const deps = { curatedPacks: () => [], findStored: async () => null };
+  const deps = { bundledPacks: () => [], findStored: async () => null };
   await assert.rejects(resolvePack("Unknown Topic", deps), TopicNotAvailableError);
   // The error is what the client is allowed to see.
   await assert.rejects(resolvePack("Unknown Topic", deps), (error) => {
@@ -170,7 +171,38 @@ test("a session refuses a pack whose id has changed under it", async () => {
 test("a curated session finds its pack by id, not by topic", async () => {
   const pack = makePack();
   const session = makeSession(pack, { packId: "other-pack" });
-  await assert.rejects(packForSession(session, { curatedPacks: () => [pack] }), TopicNotAvailableError);
+  await assert.rejects(
+    packForSession(session, { bundledPacks: () => [pack], findStored: async () => null }),
+    TopicNotAvailableError
+  );
+});
+
+test("a reviewed generated pack bundled as a file is found without the store", async () => {
+  const pack = makePack({ status: "generated", packId: "generated-file" });
+  const deps = { bundledPacks: () => [pack], findStored: async () => null };
+  assert.equal((await resolvePack("Sample Topic", deps)).packId, "generated-file");
+});
+
+test("topics lists curated first, then bundled, then stored, once each", async () => {
+  const curated = makePack({ topic: "Curated Topic" });
+  const bundled = makePack({ topic: "Bundled Topic", status: "generated", packId: "g1" });
+  const stored = makePack({ topic: "Stored Topic", status: "generated", packId: "g2" });
+  const same = makePack({ topic: "bundled topic", status: "generated", packId: "g3" });
+
+  const topics = await listTopics({
+    bundledPacks: () => [bundled, curated],
+    listStored: async () => [
+      { pack: stored },
+      { pack: same },
+      { pack: makePack({ topic: "curated topic", status: "generated" }) },
+    ],
+  });
+
+  assert.deepEqual(topics, [
+    { topic: "Curated Topic", source: "curated" },
+    { topic: "Bundled Topic", source: "generated" },
+    { topic: "Stored Topic", source: "generated" },
+  ]);
 });
 
 // --- session records ------------------------------------------------------
@@ -188,7 +220,7 @@ test("creating a session copies the pack's own topic, id and status", async () =
     topic: "SAMPLE  topic",
     goal: "exam",
     deps: {
-      curatedPacks: () => [pack],
+      bundledPacks: () => [pack],
       createSession: async (doc) => {
         stored = doc;
         return { _id: "id", ...doc };

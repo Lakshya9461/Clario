@@ -11,7 +11,7 @@
 
 const mongoose = require("mongoose");
 const { Session, Pack } = require("../models/models");
-const { loadCuratedPacks, findPackByTopic } = require("../packs/loader");
+const { loadBundledPacks, findPackByTopic } = require("../packs/loader");
 const { normalizeTopic } = require("../packs/topic");
 
 // Contract: stop the diagnostic after 3-5 questions, and cover every difficulty tier if the
@@ -106,27 +106,46 @@ class SourceTextNotSupportedError extends Error {
 // Packs
 // ---------------------------------------------------------------------------
 
-// A3: a session only ever runs on a pack that already exists — a curated JSON file, or one an
-// offline generation run stored. Generating here would put minutes of latency inside a request,
-// so a topic with no pack is a 404 instead.
+// A3: a session only ever runs on a pack that already exists — a JSON file committed with the
+// repository (curated, or a reviewed generated one), or one an offline generation run stored.
+// Generating here would put minutes of latency inside a request, so a topic with no pack is a 404.
 async function resolvePack(topic, deps = {}) {
   const normalized = normalizeTopic(topic);
   const topicKey = normalized.toLowerCase();
 
-  const curated = deps.curatedPacks ? deps.curatedPacks() : loadCuratedPacks().packs;
-  const fromFile = findPackByTopic(normalized, curated);
+  const fromFile = findPackByTopic(normalized, bundledPacks(deps));
   if (fromFile) return fromFile;
 
-  const stored = deps.findStored
-    ? await deps.findStored(topicKey)
-    : await Pack.findOne({ topicKey }).lean();
+  const stored = await storedPack(topicKey, deps);
   if (stored?.pack) return stored.pack;
 
   throw new TopicNotAvailableError();
 }
 
-function curatedPacks(deps) {
-  return deps.curatedPacks ? deps.curatedPacks() : loadCuratedPacks().packs;
+function bundledPacks(deps) {
+  return deps.bundledPacks ? deps.bundledPacks() : loadBundledPacks().packs;
+}
+
+// What a student can start right now: every pack that ships with the app, plus every generated one
+// the store still has. Curated first, because those are the reviewed ones, and one entry per topic.
+async function listTopics(deps = {}) {
+  const bundled = bundledPacks(deps);
+  const stored = deps.listStored ? await deps.listStored() : await Pack.find({}).lean();
+
+  const topics = [];
+  const seen = new Set();
+  const add = (pack, source) => {
+    const key = String(pack.topic).trim().toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    topics.push({ topic: pack.topic, source });
+  };
+
+  for (const pack of bundled.filter((entry) => entry.status === "curated")) add(pack, "curated");
+  for (const pack of bundled.filter((entry) => entry.status !== "curated")) add(pack, "generated");
+  for (const entry of stored) if (entry?.pack) add(entry.pack, "generated");
+
+  return topics;
 }
 
 async function storedPack(topicKey, deps) {
@@ -139,13 +158,12 @@ async function storedPack(topicKey, deps) {
 // silently swap the pack under a running session if one were regenerated, so the packId must
 // match before it is used.
 async function packForSession(session, deps = {}) {
-  if (session.packStatus === "curated") {
-    const found = curatedPacks(deps).find((pack) => pack.packId === session.packId);
-    if (found) return found;
-  } else {
-    const stored = await storedPack(String(session.topic).trim().toLowerCase(), deps);
-    if (stored?.pack && stored.pack.packId === session.packId) return stored.pack;
-  }
+  const fromFile = bundledPacks(deps).find((pack) => pack.packId === session.packId);
+  if (fromFile) return fromFile;
+
+  const stored = await storedPack(String(session.topic).trim().toLowerCase(), deps);
+  if (stored?.pack && stored.pack.packId === session.packId) return stored.pack;
+
   throw new TopicNotAvailableError(
     "The study pack for this session is no longer available. Start a new session."
   );
@@ -312,6 +330,7 @@ module.exports = {
   MAX_ANSWER_LENGTH,
   SourceTextNotSupportedError,
   resolvePack,
+  listTopics,
   packForSession,
   createSession,
   loadSession,

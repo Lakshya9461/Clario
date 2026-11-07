@@ -774,7 +774,29 @@
       ]
     }
   },
-  "sources": [],
+  "sources": [
+    {
+      "id": "py-docs-sys-recursionlimit",
+      "title": "sys — System-specific parameters and functions — Python 3.15.2 documentation",
+      "url": "https://docs.python.org/3/library/sys.html",
+      "license": "Python Software Foundation License Version 2",
+      "text": "sys.setrecursionlimit(limit)\nSet the maximum depth of the Python interpreter stack to limit. This limit prevents infinite recursion from causing an overflow of the C stack and crashing Python."
+    },
+    {
+      "id": "wiki-recursion",
+      "title": "Recursion (computer science) - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Recursion_(computer_science)",
+      "license": "Creative Commons Attribution-ShareAlike 4.0 License",
+      "text": "In computer science, recursion is a method of solving a computational problem where the solution depends on solutions to smaller instances of the same problem."
+    },
+    {
+      "id": "wiki-tail-call",
+      "title": "Tail call - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Tail_call",
+      "license": "Creative Commons Attribution-ShareAlike 4.0 License",
+      "text": "In computer science, a tail call is a subroutine call performed as the final action of a procedure. If the target of a tail call is the same subroutine, the subroutine is said to be tail recursive, which is a special case of direct recursion. Tail recursion (or tail-end recursion) is particularly useful, and is often easy to optimize in implementations. Tail calls can be implemented without adding a new stack frame to the call stack. Most of the frame of the current procedure is no longer needed, and can be replaced by the frame of the tail call, modified as appropriate (similar to overlay for processes, but for function calls). The program can then jump to the called subroutine. Producing such code instead of a standard call sequence is called tail-call elimination or tail-call optimization."
+    }
+  ],
   "notes": [
     "All predict_output answer keys and traces were produced by running the code, not typed by hand. Re-run build_questions.py if you change any code sample.",
     "Check rules: serve 3 questions, one per tier (1, 2, 3). Pick one from each tier at random, never reuse a question the session has already seen. Tier 3 is the transfer question. At least one question must have requiresWhy = true (tier 2).",

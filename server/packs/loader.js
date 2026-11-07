@@ -222,16 +222,15 @@ function listPackFiles(dir = PACKS_DIR) {
     .map((name) => path.join(dir, name));
 }
 
-// Curated packs are the .json files committed next to this module.
-function loadCuratedPacks(dir = PACKS_DIR) {
+// Packs that ship with the repository: the .json files committed next to this module. They carry
+// their own status, and both are served — a curated pack is one a human wrote, a bundled generated
+// pack is one that was reviewed and shipped so a fresh server has something to demo. The status is
+// kept as authored, because A4 hangs off it ("likely demonstrated" for generated evidence).
+function loadBundledPacks(dir = PACKS_DIR) {
   const packs = [];
   const errors = [];
   for (const file of listPackFiles(dir)) {
     const result = loadPackFile(file);
-    if (result.pack && result.pack.status !== "curated") {
-      errors.push({ file, errors: [`status is "${result.pack.status}": generated packs belong in Mongo`] });
-      continue;
-    }
     if (result.pack) packs.push(result.pack);
     else errors.push({ file, errors: result.errors });
   }
@@ -250,6 +249,6 @@ module.exports = {
   PACKS_DIR,
   validatePack,
   loadPackFile,
-  loadCuratedPacks,
+  loadBundledPacks,
   findPackByTopic,
 };
