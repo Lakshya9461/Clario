@@ -358,7 +358,10 @@ test("rejects questions that reference a concept outside the graph", async () =>
   const store = memoryStore();
 
   await assert.rejects(generate({ llm, store }), (error) => error.code === "topic_not_supported");
-  assert.equal(llm.count("questions"), 4, "one call per list, diagnostic then check, retried once");
+  // A rejected list gets one corrected re-ask, and the whole question step is then retried, so a
+  // list that is wrong no matter what it is told costs 2 calls per attempt: the diagnostic list
+  // passed twice and the check list failed twice within each attempt.
+  assert.equal(llm.count("questions"), 6, "diagnostic once per attempt, check twice per attempt");
   assert.equal(store.saved.size, 0);
 });
 
@@ -386,7 +389,10 @@ test("rejects a draft with more than two free_text questions per list", async ()
   const llm = makeFakeLlm({ questions: () => broken });
 
   await assert.rejects(generate({ llm, store: memoryStore() }), (error) => error.code === "topic_not_supported");
-  assert.equal(llm.count("questions"), 4, "one call per list, diagnostic then check, retried once");
+  // A rejected list gets one corrected re-ask, and the whole question step is then retried, so a
+  // list that is wrong no matter what it is told costs 2 calls per attempt: the diagnostic list
+  // passed twice and the check list failed twice within each attempt.
+  assert.equal(llm.count("questions"), 6, "diagnostic once per attempt, check twice per attempt");
 });
 
 // --- self-consistency ----------------------------------------------------
@@ -569,6 +575,37 @@ test("accepts a topic of exactly 120 characters", async () => {
   const llm = makeFakeLlm();
   const { pack } = await generate({ topic: "t".repeat(120), llm, store: memoryStore() });
   assert.equal(pack.topic.length, 120);
+});
+
+test("a rejected list is retried with the validator's own complaints attached", async () => {
+  // A blind retry re-rolls the same dice: measured against the real model, two identical asks
+  // produced the same wrong tier counts twice. The second ask therefore carries the reasons.
+  const clean = prompts.questionListMessages({
+    topic: "t",
+    goal: "exam",
+    sources: [],
+    concepts: conceptFixture(),
+    section: "check",
+  });
+  const corrected = prompts.questionListMessages({
+    topic: "t",
+    goal: "exam",
+    sources: [],
+    concepts: conceptFixture(),
+    section: "check",
+    problems: ["check: needs at least 3 questions at difficulty 3, got 2"],
+  });
+
+  assert.equal(clean.length, 2);
+  assert.equal(corrected.length, 2);
+  const prompt = corrected[1].content;
+  assert.match(prompt, /previous draft of this list was rejected/);
+  assert.match(prompt, /needs at least 3 questions at difficulty 3, got 2/);
+  assert.match(prompt, /return the whole list again/);
+  // The tier quota is a position template, not prose: it is the one shape rule a small model
+  // repeatedly missed when it was stated as a count.
+  assert.match(clean[1].content, /questions 1-2 difficulty 1, questions 3-5 difficulty 2, questions 6-8 difficulty 3/);
+  assert.ok(!clean[1].content.includes("rejected"), "a first ask carries no correction");
 });
 
 test("prompts exist for every step", () => {

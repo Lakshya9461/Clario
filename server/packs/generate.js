@@ -166,7 +166,28 @@ function conceptsMessages({ topic, goal, sources }) {
 // shared server: a slow moment loses the whole generation. Two half-size replies also give each
 // list's rules (diagnostic: no why/transfer; check: why at difficulty 2, transfer at 3) the
 // model's full attention, and a failed list costs one call to retry, not both.
-function questionListMessages({ topic, goal, sources, concepts, section }) {
+//
+// `problems` is how a rejected draft is corrected: the validator's own messages are handed back
+// with the list, so the second attempt is told what was wrong instead of being asked the same
+// question again. Measured: two identical asks in a row produced the same tier counts twice, so a
+// blind retry is a coin toss where a corrected one is not.
+// The tier floor as positions, because it is an arithmetic quota and prose loses it: asked for
+// "at least 3 at difficulty 3" a small model repeatedly returned 2 in two consecutive drafts.
+// Writing the slots out ("questions 6-8 difficulty 3") turns it into a template to fill in. The
+// numbers come from MIN_QUESTIONS_PER_TIER, which is also what the validator checks, so the two
+// cannot drift; their sum is QUESTIONS_PER_LIST.
+function tierSlotPlan() {
+  const parts = [];
+  let next = 1;
+  MIN_QUESTIONS_PER_TIER.forEach((count, index) => {
+    const last = next + count - 1;
+    parts.push(`questions ${next === last ? next : `${next}-${last}`} difficulty ${index + 1}`);
+    next = last + 1;
+  });
+  return parts.join(", ");
+}
+
+function questionListMessages({ topic, goal, sources, concepts, section, problems = [] }) {
   const conceptList = concepts.map((concept) => ({ id: concept.id, name: concept.name }));
   const sectionRules =
     section === "diagnostic"
@@ -174,6 +195,14 @@ function questionListMessages({ topic, goal, sources, concepts, section }) {
       : [
           "Check questions: every difficulty-2 question has requiresWhy true and a rubric for the explanation; every difficulty-3 question has transfer true, applying the idea to a situation the student has not seen; every other check question has transfer false.",
         ];
+  const correction = problems.length
+    ? [
+        "",
+        "The previous draft of this list was rejected for these reasons:",
+        ...problems.map((problem) => `- ${problem}`),
+        "Fix every one of them and return the whole list again.",
+      ]
+    : [];
   return [
     { role: "system", content: QUESTIONS_SYSTEM },
     {
@@ -185,9 +214,10 @@ function questionListMessages({ topic, goal, sources, concepts, section }) {
         sourceBlock(sources),
         "",
         `Produce ${QUESTIONS_PER_LIST} ${section} questions (never more than ${MAX_QUESTIONS_PER_LIST} in this list).`,
-        `At least ${MIN_QUESTIONS_PER_TIER[0]} at difficulty 1, at least ${MIN_QUESTIONS_PER_TIER[1]} at difficulty 2, at least ${MIN_QUESTIONS_PER_TIER[2]} at difficulty 3.`,
+        `Difficulty is decided by position, exactly: ${tierSlotPlan()}. A list with a different count in any tier is discarded.`,
         ...sectionRules,
         'At least one and at most two "free_text" questions; the rest are "mcq". Omit fields that do not apply to the question kind.',
+        ...correction,
         "",
         "Return:",
         `{"questions":[{"id":"...","kind":"mcq|free_text","prompt":"...","options":["a","b","c","d"],"correctOptionIndex":0,"conceptIds":["id"],"difficulty":1,"transfer":false,"requiresWhy":false,"rubric":"...","feedback":{"correct":"...","incorrect":"..."}}]}`,
@@ -558,28 +588,40 @@ async function draftConcepts({ topic, goal, sources, chatJsonFn }) {
   return valid ? concepts : null;
 }
 
+// One list, with one correction attempt: a draft that fails the shape check is asked again with the
+// validator's own messages attached, which is the difference between a retry and a re-roll.
 async function draftQuestionList({ section, topic, goal, sources, concepts, conceptIds, chatJsonFn }) {
   // Thinking off for the same reason as the concepts draft, and more so: this is the largest
   // reply in the generation, and with the server's thinking default its stream does not
   // finish inside the timeout at all — the run fails with generation_unavailable before any
   // question exists. Off completes in about a minute with the full list.
-  const value = await askJson(
-    chatJsonFn,
-    questionListMessages({ topic, goal, sources, concepts, section }),
-    questionListResponseSchema,
-    { questions: [] },
-    { reasoning: "off" }
-  );
-  if (!value) return null;
+  let problems = [];
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const value = await askJson(
+      chatJsonFn,
+      questionListMessages({ topic, goal, sources, concepts, section, problems }),
+      questionListResponseSchema,
+      { questions: [] },
+      { reasoning: "off" }
+    );
+    if (!value) return null;
 
-  const errors = draftErrors(value.questions, section, conceptIds);
-  if (process.env.CLARIO_DEBUG_GEN) {
-    console.log(`[debug draftQuestionList ${section}] errors: ${JSON.stringify(errors)} size=${value.questions.length}`);
+    const errors = draftErrors(value.questions, section, conceptIds);
+    if (process.env.CLARIO_DEBUG_GEN) {
+      console.log(
+        `[debug draftQuestionList ${section} try ${attempt}] errors: ${JSON.stringify(errors)} size=${value.questions.length}`
+      );
+    }
+    if (!errors.length) {
+      const prefix = section === "diagnostic" ? "d" : "c";
+      return value.questions.map((question, index) => ({
+        ...shuffleOptions(question),
+        id: `${prefix}${index + 1}`,
+      }));
+    }
+    problems = errors;
   }
-  if (errors.length) return null;
-
-  const prefix = section === "diagnostic" ? "d" : "c";
-  return value.questions.map((question, index) => ({ ...shuffleOptions(question), id: `${prefix}${index + 1}` }));
+  return null;
 }
 
 async function draftQuestions({ topic, goal, sources, concepts, conceptIds, chatJsonFn }) {
