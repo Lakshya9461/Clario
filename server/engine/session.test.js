@@ -198,10 +198,12 @@ test("topics lists curated first, then bundled, then stored, once each", async (
     ],
   });
 
+  // A bundled generated pack was key-checked before it was committed; one that is only in the store
+  // may be as the model wrote it, so the two are not reported the same way.
   assert.deepEqual(topics, [
-    { topic: "Curated Topic", source: "curated" },
-    { topic: "Bundled Topic", source: "generated" },
-    { topic: "Stored Topic", source: "generated" },
+    { topic: "Curated Topic", source: "curated", reviewed: true },
+    { topic: "Bundled Topic", source: "generated", reviewed: true },
+    { topic: "Stored Topic", source: "generated", reviewed: false },
   ]);
 });
 

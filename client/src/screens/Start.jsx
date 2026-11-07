@@ -14,10 +14,13 @@ import Notice from "../components/Notice.jsx";
 import { GOALS } from "../labels.js";
 import { DATA_NOTICE } from "../privacy.js";
 
-// A generated pack is assistant-written and unreviewed (A4), so the list says which kind each entry
-// is instead of showing one unqualified list.
-function sourceLabel(source) {
-  return source === "curated" ? "reviewed" : "assistant-written, unreviewed";
+// A generated pack is weaker evidence than a curated one (A4), so the list says which kind each
+// entry is instead of showing one unqualified list. `reviewed` is the server's answer to a second,
+// separate question: was this assistant-written pack actually read and key-checked before it was
+// served, or is it as the model wrote it?
+function sourceLabel(entry) {
+  if (entry.source === "curated") return "reviewed";
+  return entry.reviewed ? "assistant-written, key-checked" : "assistant-written, unreviewed";
 }
 
 export default function Start({ onStarted }) {
@@ -101,7 +104,7 @@ export default function Start({ onStarted }) {
                     aria-pressed={topic === entry.topic}
                   >
                     <span className="topic__name">{entry.topic}</span>
-                    <span className="topic__source">{sourceLabel(entry.source)}</span>
+                    <span className="topic__source">{sourceLabel(entry)}</span>
                   </button>
                 </li>
               ))}

@@ -787,8 +787,8 @@ test("GET /topics offers the prepared topics, curated first, without calling the
     const { status, body } = await harness.get("/topics");
     assert.equal(status, 200);
     assert.deepEqual(body.topics, [
-      { topic: "Sample Topic", source: "curated" },
-      { topic: "Stored Topic", source: "generated" },
+      { topic: "Sample Topic", source: "curated", reviewed: true },
+      { topic: "Stored Topic", source: "generated", reviewed: false },
     ]);
     assert.equal(harness.chat.calls.length, 0);
   } finally {

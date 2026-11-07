@@ -35,6 +35,20 @@ README (A1–A5), the amendment wins.
 All requests and responses are JSON. The client origin must be listed in `CLIENT_ORIGIN`
 (exact match, no wildcard) or the browser request is refused by CORS.
 
+### GET /topics
+What a student can start right now, so the client can offer choices instead of a 404.
+
+Res `200`: `{ "topics": [{ "topic": string, "source": "curated"|"generated", "reviewed": boolean }] }`
+- Packs that ship with the repository come first, curated before generated; packs that exist only
+  in the store follow. One entry per topic, compared case-insensitively.
+- `reviewed` answers a different question from `source`: a generated pack committed to the
+  repository was read and key-checked before it got there, while one still only in the store may
+  be exactly as the model wrote it. `source` still decides A4's `certainty`, so a reviewed
+  generated pack never says `demonstrated`.
+- No model call and no evidence: this is a list, not a generation.
+
+Errors: none of its own; it is mounted behind the same per-address rate limit as everything else.
+
 ### POST /session
 Start a session on an existing pack.
 

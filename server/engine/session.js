@@ -127,23 +127,29 @@ function bundledPacks(deps) {
 }
 
 // What a student can start right now: every pack that ships with the app, plus every generated one
-// the store still has. Curated first, because those are the reviewed ones, and one entry per topic.
+// the store still has. Curated first, and one entry per topic.
+//
+// `reviewed` is not the same claim as `status`. A generated pack keeps status "generated" (A4: only
+// a curated, code-keyed pack can say "demonstrated"), but a generated pack that is committed to the
+// repository was read and key-checked by a human before it got there, while one still in the store
+// may be exactly as the model wrote it. The distinction is worth reporting, because the client tells
+// the student which kind of pack they are practising on.
 async function listTopics(deps = {}) {
   const bundled = bundledPacks(deps);
   const stored = deps.listStored ? await deps.listStored() : await Pack.find({}).lean();
 
   const topics = [];
   const seen = new Set();
-  const add = (pack, source) => {
+  const add = (pack, source, reviewed) => {
     const key = String(pack.topic).trim().toLowerCase();
     if (!key || seen.has(key)) return;
     seen.add(key);
-    topics.push({ topic: pack.topic, source });
+    topics.push({ topic: pack.topic, source, reviewed });
   };
 
-  for (const pack of bundled.filter((entry) => entry.status === "curated")) add(pack, "curated");
-  for (const pack of bundled.filter((entry) => entry.status !== "curated")) add(pack, "generated");
-  for (const entry of stored) if (entry?.pack) add(entry.pack, "generated");
+  for (const pack of bundled.filter((entry) => entry.status === "curated")) add(pack, "curated", true);
+  for (const pack of bundled.filter((entry) => entry.status !== "curated")) add(pack, "generated", true);
+  for (const entry of stored) if (entry?.pack) add(entry.pack, "generated", false);
 
   return topics;
 }
