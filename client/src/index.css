@@ -161,6 +161,56 @@ h3 {
   margin: 0 0 0.75rem;
 }
 
+/* The topics that are prepared right now. A row of small choices under the field, so a student can
+   pick one instead of typing a name the server does not have. */
+.start__topics-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.start__topics-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topic {
+  display: grid;
+  gap: 0.1rem;
+  font: inherit;
+  text-align: left;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.topic:hover:not(:disabled),
+.topic[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.topic:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.topic__name {
+  font-weight: 600;
+}
+
+/* A4: an assistant-written pack is weaker evidence than a reviewed one, so the list says which. */
+.topic__source {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
 /* What the beta keeps. Set apart from the note above it, because it is the one paragraph on the
    start screen a student may come back to read. */
 .data-notice {

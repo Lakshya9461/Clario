@@ -3,18 +3,45 @@
 // The topic is sent as text and nothing else. Pasted source text is deliberately absent: this
 // build only serves packs that were prepared ahead of time, and the server refuses a paste with
 // source_text_not_supported rather than quietly answering from general knowledge.
+//
+// The list of prepared topics comes from the server so a student does not have to guess a name and
+// collect a 404. It is a shortcut, not a requirement: a typed topic still goes through the same
+// request, and a list that cannot be fetched simply does not appear.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import Notice from "../components/Notice.jsx";
 import { GOALS } from "../labels.js";
 import { DATA_NOTICE } from "../privacy.js";
 
+// A generated pack is assistant-written and unreviewed (A4), so the list says which kind each entry
+// is instead of showing one unqualified list.
+function sourceLabel(source) {
+  return source === "curated" ? "reviewed" : "assistant-written, unreviewed";
+}
+
 export default function Start({ onStarted }) {
   const [topic, setTopic] = useState("");
   const [goal, setGoal] = useState("exam");
+  const [topics, setTopics] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .topics()
+      .then((data) => {
+        if (active) setTopics(Array.isArray(data?.topics) ? data.topics : []);
+      })
+      .catch(() => {
+        // Nothing to say here: the form below still works, and starting a session reports the real
+        // failure if the server is down.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -57,6 +84,30 @@ export default function Start({ onStarted }) {
             disabled={busy}
           />
         </label>
+
+        {topics.length ? (
+          <div className="start__topics">
+            <p className="start__topics-label" id="prepared-topics">
+              Prepared right now
+            </p>
+            <ul className="start__topics-list" aria-labelledby="prepared-topics">
+              {topics.map((entry) => (
+                <li key={entry.topic}>
+                  <button
+                    type="button"
+                    className="topic"
+                    onClick={() => setTopic(entry.topic)}
+                    disabled={busy}
+                    aria-pressed={topic === entry.topic}
+                  >
+                    <span className="topic__name">{entry.topic}</span>
+                    <span className="topic__source">{sourceLabel(entry.source)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <label className="field">
           <span className="field__label">Studying for</span>

@@ -81,5 +81,8 @@ export const api = {
   check: ({ sessionId, questionId, answer, why = null }) =>
     post("/check", { sessionId, questionId, answer, why }),
 
+  // What is prepared right now, so a student can pick instead of guessing and getting a 404.
+  topics: () => get("/topics"),
+
   model: (sessionId) => get(`/model/${encodeURIComponent(sessionId)}`),
 };
