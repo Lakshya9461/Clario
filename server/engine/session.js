@@ -194,6 +194,16 @@ async function claimQuestion({ session, questionId, skipped = false, deps = {} }
   return Boolean(claimed);
 }
 
+// Gives a claim back. The claim exists so an answer is graded once, not so a failed grading
+// consumes the question: when the model is busy or unreachable, no evidence was written and the
+// student must be able to retry the same answer. Only called before anything is appended.
+async function releaseQuestion({ session, questionId, deps = {} } = {}) {
+  const release =
+    deps.release ||
+    ((id, update) => Session.updateOne({ _id: id }, update));
+  await release(session._id, { $pull: { answeredQuestionIds: questionId } });
+}
+
 // ---------------------------------------------------------------------------
 // Question choice (pure: no database, no clock)
 // ---------------------------------------------------------------------------
@@ -306,6 +316,7 @@ module.exports = {
   createSession,
   loadSession,
   claimQuestion,
+  releaseQuestion,
   publicQuestion,
   nextDiagnosticQuestion,
   answeredDiagnostic,

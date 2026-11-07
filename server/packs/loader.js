@@ -35,6 +35,9 @@ const questionSchema = z.object({
   transfer: z.boolean(),
   requiresWhy: z.boolean(),
   answerKey: answerKeySchema,
+  // Set by a pack on a question that asks the student to rate themselves: it has no key and is
+  // recorded as a self-report instead of being graded.
+  selfReport: z.boolean().optional(),
   rubric: z.string().optional(),
   fallbackFeedback: z.object({ correct: z.string().min(1), incorrect: z.string().min(1) }),
   optionHints: z.record(z.string(), z.string()).optional(),

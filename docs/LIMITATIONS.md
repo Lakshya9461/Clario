@@ -52,9 +52,10 @@ verified against the code, with the file that causes it.
 - **What is stored:** the topic, the goal text (40 characters max), which questions were answered,
   and one evidence event per concept per answer (with a short note). Not stored: names, emails,
   IPs, or the answer text itself.
-- **The only rate limit is one crude per-address window.** 60 requests a minute per address, over
-  the whole API, swept in memory (`server/rate-limit.js`); past it the answer is `429
-  rate_limited` with a `Retry-After`. That is enough to stop one script burning the model queue,
+- **The only rate limit is one crude per-address window.** 60 requests a minute per address by
+  default (`RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS` raise or widen it for a room where several
+  people share one address), over the whole API, swept in memory (`server/rate-limit.js`); past it
+  the answer is `429 rate_limited` with a `Retry-After`. That is enough to stop one script burning the model queue,
   and not enough to stop a determined one: the count is per address (a campus behind one NAT
   shares an allowance, which is why the limit is generous), it is fixed-window rather than
   smoothed, and the address comes from `X-Forwarded-For`, so it is only as honest as the proxy in

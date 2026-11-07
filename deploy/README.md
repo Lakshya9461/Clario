@@ -15,12 +15,18 @@ That "proxy only" rule is what makes the API's per-address request limit meaning
 API reads the client address from `X-Forwarded-For` (one trusted hop), so publishing the
 API port directly would let a caller pick its own address and step around the limit.
 
-The API reads `server/.env` when that file exists. Host environment values for
-`LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY` are passed through (set each one you need);
-other server settings can be placed in `server/.env`.
+The API reads `server/.env` when that file exists, and that file is the only source of the
+model settings (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_MS`): they are
+deliberately absent from `environment` in `docker-compose.yml`, because an empty default
+there would override the file with `""`. A host shell variable of the same name does not
+reach the container; write it into `server/.env`.
 `CLIENT_ORIGIN` defaults to `http://localhost:8080`. Set it to the exact public URL used
 by the browser, including scheme, host, and port. `MONGO_URL` is set to the Compose
 MongoDB service and overrides any value in the env file.
+
+`api` waits for the `mongo` healthcheck (`condition: service_healthy`), because the server
+exits when the database is unreachable at startup, and every service uses
+`restart: unless-stopped` so a reboot or a crash brings the stack back.
 
 When using Strata on the host, set `LLM_BASE_URL` to an address reachable from the API
 container, such as `http://host.docker.internal:8080/v1`. The Compose API service maps

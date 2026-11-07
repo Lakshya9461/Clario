@@ -34,7 +34,8 @@ generated pack.
 - `llm.js` runs 2 requests in flight and queues 3; past that it throws `LlmBusyError`,
   which the routes answer as 503 `{ error: "busy" }`. A busy queue is not `degraded`.
 - `server/rate-limit.js` allows 60 requests a minute per address and answers 429
-  `rate_limited` with a `Retry-After`; `/health` is mounted before it, so a monitor cannot
+  `rate_limited` with a `Retry-After`; `RATE_LIMIT_MAX`/`RATE_LIMIT_WINDOW_MS` override it for a
+  room where several people share one address. `/health` is mounted before it, so a monitor cannot
   be limited. It reads `req.ip`, which is the client only because `app.js` sets
   `trust proxy 1` and the deployment publishes nothing but the proxy.
 - Token caps and reasoning modes in the generation prompts are **measured against the real

@@ -10,11 +10,13 @@
 const BASE = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:3000";
 
 export class ApiError extends Error {
-  constructor(message, { code = "request_failed", status = 0 } = {}) {
+  constructor(message, { code = "request_failed", status = 0, retryAfter = null } = {}) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.status = status;
+    // Seconds the server asked the caller to wait, when it said so (429).
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -34,9 +36,16 @@ async function request(path, init) {
   }
 
   if (!response.ok) {
-    throw new ApiError(body?.message || `The server answered ${response.status}.`, {
-      code: body?.error,
+    // A 429 is the one failure a proxy may answer without this server's JSON, so it gets a
+    // readable fallback of its own.
+    const fallback =
+      response.status === 429
+        ? "Too many requests from this connection. Wait a moment, then try again."
+        : `The server answered ${response.status}.`;
+    throw new ApiError(body?.message || fallback, {
+      code: body?.error || (response.status === 429 ? "rate_limited" : "request_failed"),
       status: response.status,
+      retryAfter: Number(response.headers.get("Retry-After")) || null,
     });
   }
   return body;

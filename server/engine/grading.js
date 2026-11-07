@@ -110,6 +110,51 @@ function keyedEvents({ question, outcome, packStatus }) {
   }));
 }
 
+// A self-report question asks the student to rate themselves. It has no key and no rubric, so
+// there is nothing to grade: what the student says is evidence of what they CLAIM, and the model
+// must not be asked to turn it into a demonstration. The pack may mark one with "selfReport": true;
+// a question with neither an answer key nor a rubric is one in effect, because there is nothing
+// else it could be graded against.
+function isSelfReport(question) {
+  return question.selfReport === true || (!question.answerKey && !question.rubric);
+}
+
+// The options are a scale, so the claim is read by position, never by wording: the bottom of the
+// scale is "unsure" and any higher option is the student saying they have it. An answer that is not
+// one of the options cannot be read as a claim either way, so it is "unsure" too.
+function selfReportOutcome(question, answer) {
+  const options = question.options || [];
+  const text = normalizeText(answer);
+  const byText = options.findIndex((option) => normalizeText(option) === text);
+  const byPosition = text !== "" && Number.isInteger(Number(answer)) ? Number(answer) : -1;
+  const position = byText >= 0 ? byText : byPosition;
+  return position > 0 && position < options.length ? "correct" : "unsure";
+}
+
+const SELF_REPORT_NOTE = {
+  correct: "Student rated their own grasp of this as confident.",
+  unsure: "Student rated their own grasp of this as unsure.",
+};
+
+// Never a demonstration, never a quality: the student's own claim, recorded as such.
+function selfReportEvents({ question, answer }) {
+  const outcome = selfReportOutcome(question, answer);
+  return question.conceptIds.map((conceptId) => ({
+    conceptId,
+    questionId: question.id,
+    evidenceType: "self_report",
+    gradedBy: "student",
+    evidenceQuality: null,
+    outcome,
+    note: SELF_REPORT_NOTE[outcome],
+  }));
+}
+
+// A graded answer gets the pack's own wording when the model is unavailable; a self-report is not
+// graded at all, so it says what was recorded instead of pretending to mark it.
+const SELF_REPORT_FEEDBACK =
+  "Recorded as your own rating. It is kept apart from what you demonstrate, so it never counts as a correct answer.";
+
 function gradeMessages({ question, answer, why }) {
   const lines = [
     `<question>${asData(question.prompt)}</question>`,
@@ -222,4 +267,8 @@ module.exports = {
   writeFeedback,
   gradeResponseSchema,
   normalizeText,
+  isSelfReport,
+  selfReportOutcome,
+  selfReportEvents,
+  SELF_REPORT_FEEDBACK,
 };

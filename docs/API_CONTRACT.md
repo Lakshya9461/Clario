@@ -161,7 +161,7 @@ order, so grading can never disagree with the screen.
 | 404 | `session_not_found` | unknown or malformed `sessionId` |
 | 404 | `not_found` | no route for that method and path |
 | 409 | `question_already_answered` | the question was already claimed; nothing is graded twice |
-| 429 | `rate_limited` | more than 60 requests in a minute from one address; `Retry-After` says when to retry |
+| 429 | `rate_limited` | more requests than the allowance in the window from one address (`RATE_LIMIT_MAX`, default 60 per minute); `Retry-After` says when to retry |
 | 503 | `busy` | LLM queue full (2 in flight, 3 waiting). Retry; this is not `degraded` |
 | 500 | `server_error` | anything else; the message is always "Something went wrong." |
 

@@ -6,10 +6,11 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const express = require("express");
 const { createRouter } = require("./routes");
+const { LlmBusyError } = require("./llm");
 const { toHttpError } = require("./errors");
 const { makePack, makeSession, makeFakeChat, freeText } = require("./engine/fixtures");
 
-async function setup({ packOverrides = {}, replies = {} } = {}) {
+async function setup({ packOverrides = {}, replies = {}, chatJson } = {}) {
   const pack = makePack({
     check: [
       makePack().check[0],
@@ -46,7 +47,13 @@ async function setup({ packOverrides = {}, replies = {} } = {}) {
         events.push(...documents);
         return documents;
       },
-      chatJson: chat.fn,
+      chatJson: chatJson ?? chat.fn,
+      release: async (id, update) => {
+        const questionId = update.$pull.answeredQuestionIds;
+        session.answeredQuestionIds = session.answeredQuestionIds.filter(
+          (entry) => entry !== questionId
+        );
+      },
     })
   );
   app.use((req, res) => res.status(404).json({ error: "not_found" }));
@@ -605,6 +612,164 @@ test("the learner model shows unassessed concepts as unknown, with notes from ev
     assert.equal(unassessed.status, "unknown");
     assert.deepEqual(unassessed.notes, []);
     assert.equal(body.lowEvidence, false);
+  } finally {
+    await harness.close();
+  }
+});
+
+// --- self-report questions and a released claim ---------------------------
+
+// A scale question: no key, no rubric, so there is nothing to grade and nothing for the model to
+// decide. The pack marks it, which is what a generated pack does for a "how comfortable are you"
+// item.
+function selfReportQuestion(id, difficulty) {
+  return {
+    id,
+    kind: "mcq",
+    prompt: "How comfortable are you with this idea so far?",
+    options: ["Not yet", "Getting there", "Confident"],
+    conceptIds: ["part_2"],
+    difficulty,
+    transfer: false,
+    requiresWhy: false,
+    answerKey: null,
+    selfReport: true,
+    fallbackFeedback: { correct: "Noted.", incorrect: "Noted." },
+  };
+}
+
+test("a self-report answer is the student's own claim, with no model call", async () => {
+  const question = selfReportQuestion("d1", 1);
+  const harness = await setup({
+    packOverrides: { diagnostic: [question, ...makePack().diagnostic.slice(1)] },
+  });
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic" });
+    assert.equal(started.firstQuestion.id, "d1");
+
+    const { status, body } = await harness.post("/diagnose", {
+      sessionId: started.sessionId,
+      questionId: "d1",
+      answer: question.options[2],
+    });
+
+    assert.equal(status, 200);
+    assert.equal(harness.chat.calls.length, 0, "a self rating must never reach the model");
+    assert.equal(body.evidenceCount, 1);
+    assert.equal(harness.events.length, 1);
+
+    const [event] = harness.events;
+    assert.equal(event.evidenceType, "self_report");
+    assert.equal(event.gradedBy, "student");
+    assert.equal(event.evidenceQuality, null);
+    assert.equal(event.outcome, "correct");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("the bottom of a self-report scale is unsure, and it stays self_reported in the model", async () => {
+  const question = selfReportQuestion("d1", 1);
+  const harness = await setup({
+    packOverrides: { diagnostic: [question, ...makePack().diagnostic.slice(1)] },
+  });
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic" });
+    await harness.post("/diagnose", {
+      sessionId: started.sessionId,
+      questionId: "d1",
+      answer: question.options[0],
+    });
+
+    assert.equal(harness.events[0].outcome, "unsure");
+
+    const { body: model } = await harness.get(`/model/${started.sessionId}`);
+    const concept = model.concepts.find((entry) => entry.id === "part_2");
+    assert.equal(concept.status, "self_reported", "a claim is never reported as demonstrated");
+    assert.equal(concept.eventCount, 1);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("a self-report check question is not graded and does not ask for feedback", async () => {
+  const question = selfReportQuestion("c1", 1);
+  const harness = await setup({ packOverrides: { check: [question] } });
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic" });
+    const { status, body } = await harness.post("/check", {
+      sessionId: started.sessionId,
+      questionId: "c1",
+      answer: question.options[1],
+    });
+
+    assert.equal(status, 200);
+    assert.equal(harness.chat.calls.length, 0);
+    assert.equal(body.selfReport, true);
+    assert.equal(body.correct, null, "a claim is neither right nor wrong");
+    assert.match(body.feedback, /your own rating/i);
+    assert.equal(harness.events[0].evidenceType, "self_report");
+  } finally {
+    await harness.close();
+  }
+});
+
+test("a busy model releases the diagnostic claim so the retry can grade the answer", async () => {
+  const chat = makeFakeChat();
+  let busy = true;
+  const harness = await setup({
+    packOverrides: {
+      diagnostic: [freeText("d1", 1), ...makePack().diagnostic.slice(1)],
+    },
+    chatJson: (messages, schema, fallback, options) =>
+      busy ? Promise.reject(new LlmBusyError()) : chat.fn(messages, schema, fallback, options),
+  });
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic" });
+
+    const first = await harness.post("/diagnose", {
+      sessionId: started.sessionId,
+      questionId: "d1",
+      answer: "An answer that needs grading.",
+    });
+    assert.equal(first.status, 503);
+    assert.equal(first.body.error, "busy");
+    assert.equal(harness.events.length, 0);
+    assert.deepEqual(harness.session.answeredQuestionIds, [], "the claim goes back");
+
+    busy = false;
+    const retry = await harness.post("/diagnose", {
+      sessionId: started.sessionId,
+      questionId: "d1",
+      answer: "An answer that needs grading.",
+    });
+    assert.equal(retry.status, 200, "the retry grades instead of answering 409");
+    assert.equal(harness.events.length, 1);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("a busy model releases the check claim too", async () => {
+  const chat = makeFakeChat();
+  let busy = true;
+  const harness = await setup({
+    chatJson: (messages, schema, fallback, options) =>
+      busy ? Promise.reject(new LlmBusyError()) : chat.fn(messages, schema, fallback, options),
+  });
+  try {
+    const { body: started } = await harness.post("/session", { topic: "Sample Topic" });
+    const answer = { sessionId: started.sessionId, questionId: "c2", answer: "An explanation." };
+
+    const first = await harness.post("/check", answer);
+    assert.equal(first.status, 503);
+    assert.equal(harness.events.length, 0);
+    assert.deepEqual(harness.session.answeredQuestionIds, []);
+
+    busy = false;
+    const retry = await harness.post("/check", answer);
+    assert.equal(retry.status, 200);
+    assert.ok(harness.events.length >= 1);
   } finally {
     await harness.close();
   }

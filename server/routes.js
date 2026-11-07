@@ -19,6 +19,7 @@ const {
   QuestionAlreadyAnsweredError,
   SourceTextNotSupportedError,
   claimQuestion,
+  releaseQuestion,
   checkComplete,
   createSession,
   diagnosisComplete,
@@ -31,7 +32,7 @@ const {
 } = require("./engine/session");
 const { buildPlan, planSteps, stepAt } = require("./engine/plan");
 const { buildLesson } = require("./engine/lesson");
-const { gradeKeyed, gradeWritten, keyedEvents, writeFeedback } = require("./engine/grading");
+const { gradeKeyed, gradeWritten, keyedEvents, writeFeedback, isSelfReport, selfReportEvents, SELF_REPORT_FEEDBACK } = require("./engine/grading");
 
 const defaultDeps = {
   chatJson,
@@ -77,9 +78,18 @@ function requireAnswer(answer) {
   return text;
 }
 
-// A keyed question is graded in code, exactly. Everything else is graded by the model, which may
+// A keyed question is graded in code, exactly. A self-report question is not graded at all: the
+// student's own rating is recorded as a claim. Everything else is graded by the model, which may
 // only propose evidence; a failed grading records nothing rather than inventing it.
 async function gradeAnswer({ question, answer, why, pack, deps }) {
+  if (isSelfReport(question)) {
+    return {
+      correct: null,
+      selfReport: true,
+      events: selfReportEvents({ question, answer }),
+      degraded: false,
+    };
+  }
   const keyed = gradeKeyed(question, answer);
   if (keyed) {
     return {
@@ -132,8 +142,16 @@ function createRouter(overrides = {}) {
     if (!claimed) throw new QuestionAlreadyAnsweredError();
 
     if (!isSkip) {
-      const { events } = await gradeAnswer({ question, answer: answerText, why: "", pack, deps });
-      await appendEvents({ sessionId: String(session._id), pack, events, deps });
+      let graded;
+      try {
+        graded = await gradeAnswer({ question, answer: answerText, why: "", pack, deps });
+      } catch (error) {
+        // Nothing was written, so the claim must go back: otherwise a busy or unreachable model
+        // would leave the question answered with no evidence and the retry would be a 409.
+        await releaseQuestion({ session, questionId, deps });
+        throw error;
+      }
+      await appendEvents({ sessionId: String(session._id), pack, events: graded.events, deps });
     }
 
     const answered = answersWith(session, questionId);
@@ -209,14 +227,24 @@ function createRouter(overrides = {}) {
     const claimed = await claimQuestion({ session, questionId, deps });
     if (!claimed) throw new QuestionAlreadyAnsweredError();
 
-    const graded = await gradeAnswer({ question, answer: answerText, why: explanation, pack, deps });
-    const feedback = await writeFeedback({
-      question,
-      answer: answerText,
-      why: explanation,
-      correct: graded.correct,
-      chatJsonFn: deps.chatJson,
-    });
+    let graded;
+    let feedback;
+    try {
+      graded = await gradeAnswer({ question, answer: answerText, why: explanation, pack, deps });
+      // A self-report is not graded, so its feedback is engine text, not a model call.
+      feedback = graded.selfReport
+        ? { feedback: SELF_REPORT_FEEDBACK, whyEvent: null, degraded: false }
+        : await writeFeedback({
+            question,
+            answer: answerText,
+            why: explanation,
+            correct: graded.correct,
+            chatJsonFn: deps.chatJson,
+          });
+    } catch (error) {
+      await releaseQuestion({ session, questionId, deps });
+      throw error;
+    }
 
     const events = feedback.whyEvent ? [...graded.events, feedback.whyEvent] : graded.events;
     await appendEvents({ sessionId: String(session._id), pack, events, deps });
@@ -227,6 +255,7 @@ function createRouter(overrides = {}) {
 
     res.json({
       correct: graded.correct,
+      selfReport: graded.selfReport === true,
       feedback: feedback.feedback,
       nextQuestion: nextQuestion ? publicQuestion(nextQuestion) : null,
       checkComplete: complete,

@@ -1,7 +1,7 @@
 // Unit tests for the per-address request limit. Run with: npm test
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { rateLimit } = require("./rate-limit");
+const { rateLimit, limitFromEnv, MAX_REQUESTS, WINDOW_MS } = require("./rate-limit");
 
 function call(limit, { method = "POST", ip = "203.0.113.7" } = {}) {
   const req = { method, ip, socket: { remoteAddress: ip } };
@@ -77,4 +77,21 @@ test("sweeps expired windows instead of keeping every address", () => {
   nowMs += 1_000;
   assert.equal(call(limit, { ip: "198.51.100.9" }).passed, true);
   assert.equal(call(limit, { ip: "198.51.100.9" }).passed, false);
+});
+
+test("the allowance is configurable, and an unreadable value keeps the default", () => {
+  assert.deepEqual(limitFromEnv({ RATE_LIMIT_MAX: "600", RATE_LIMIT_WINDOW_MS: "30000" }), {
+    max: 600,
+    windowMs: 30000,
+  });
+  assert.deepEqual(limitFromEnv({}), { max: undefined, windowMs: undefined });
+  assert.deepEqual(limitFromEnv({ RATE_LIMIT_MAX: "lots", RATE_LIMIT_WINDOW_MS: "-1" }), {
+    max: undefined,
+    windowMs: undefined,
+  });
+  // Undefined means "keep rateLimit's own default", which is the beta allowance.
+  const limit = rateLimit(limitFromEnv({}));
+  for (let i = 0; i < MAX_REQUESTS; i += 1) assert.equal(call(limit).passed, true);
+  assert.equal(call(limit).passed, false);
+  assert.equal(WINDOW_MS, 60_000);
 });

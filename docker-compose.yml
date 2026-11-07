@@ -3,25 +3,36 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+    # The model settings come from server/.env and nothing else: listing them under `environment`
+    # with an empty default would override the file with "" and the container would start without
+    # a model. MONGO_URL is the one value compose must replace, because inside the network the
+    # database is the mongo service, not the URL in the file.
     env_file:
       - path: ./server/.env
         required: false
     environment:
       MONGO_URL: mongodb://mongo:27017/clario
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:8080}
-      LLM_BASE_URL: ${LLM_BASE_URL:-}
-      LLM_MODEL: ${LLM_MODEL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
     extra_hosts:
       - host.docker.internal:host-gateway
+    # index.js exits when Mongo is not reachable yet, so the wait is a healthcheck, not "service
+    # started", and the restart policy brings the API back after a reboot or a crash.
+    restart: unless-stopped
     depends_on:
       mongo:
-        condition: service_started
+        condition: service_healthy
 
   mongo:
     image: mongo:8
+    restart: unless-stopped
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   proxy:
     build:
@@ -29,6 +40,7 @@ services:
       dockerfile: client/Dockerfile
       args:
         VITE_API_URL: /api
+    restart: unless-stopped
     ports:
       - "8080:80"
     depends_on:

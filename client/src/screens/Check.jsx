@@ -87,8 +87,8 @@ export default function Check({ session, onDone }) {
 
       {result ? (
         <div className="result">
-          <p className={`result__verdict ${result.correct ? "result__verdict--right" : ""}`}>
-            {result.correct ? "Correct" : "Not this time"}
+          <p className={`result__verdict ${result.correct === true ? "result__verdict--right" : ""}`}>
+            {result.selfReport ? "Your own rating" : result.correct === true ? "Correct" : "Not this time"}
           </p>
           {result.feedback ? <p className="result__feedback">{result.feedback}</p> : null}
           {result.degraded ? (

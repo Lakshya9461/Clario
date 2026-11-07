@@ -4,7 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const { toHttpError } = require("./errors");
 const { createRouter } = require("./routes");
-const { rateLimit } = require("./rate-limit");
+const { rateLimit, limitFromEnv } = require("./rate-limit");
 
 const app = express();
 
@@ -23,7 +23,7 @@ app.get("/health", (req, res) => {
 // order to read it, then the limiter before the body is parsed, so a rejected request costs
 // nothing.
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
-app.use(rateLimit());
+app.use(rateLimit(limitFromEnv()));
 app.use(express.json({ limit: "1mb" }));
 
 app.use(createRouter());

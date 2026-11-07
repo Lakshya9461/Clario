@@ -25,8 +25,11 @@ cd ../client && npm install
 ```
 
 `.env` lives only in `server/` and is git-ignored. Keys: `PORT`, `MONGO_URL`,
-`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_MS`, `CLIENT_ORIGIN`.
+`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_MS`, `CLIENT_ORIGIN`,
+`RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`.
 `LLM_TIMEOUT_MS` is optional (default 90000) and caps one completion, streaming included.
+`RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS` are optional (default 60 requests per 60000 ms):
+raise them when several people share one address, such as a campus or lab NAT.
 
 The LLM client streams every completion. Generation asks for ~2k tokens of JSON, which a
 slow model can take minutes over, and a proxy in front of the LLM (Cloudflare and friends)
