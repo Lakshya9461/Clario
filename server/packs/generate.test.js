@@ -126,7 +126,7 @@ function makeFakeLlm(options = {}) {
       ? "topiccheck"
       : text.includes('"answerIndex"')
         ? "selfcheck"
-        : text.includes('"diagnostic"')
+        : text.includes('"questions"')
           ? "questions"
           : "concepts";
     const attempt = log.filter((call) => call.kind === kind).length;
@@ -148,8 +148,9 @@ function makeFakeLlm(options = {}) {
       return { value: { concepts }, degraded: false };
     }
     if (kind === "questions") {
-      const questions = options.questions ? options.questions(attempt) : questionFixture();
-      return { value: questions, degraded: false };
+      const fixture = options.questions ? options.questions(attempt) : questionFixture();
+      const section = text.includes("diagnostic questions") ? "diagnostic" : "check";
+      return { value: { questions: fixture[section] }, degraded: false };
     }
     const answerIndex = options.selfCheck
       ? options.selfCheck(text, attempt)
@@ -357,7 +358,7 @@ test("rejects questions that reference a concept outside the graph", async () =>
   const store = memoryStore();
 
   await assert.rejects(generate({ llm, store }), (error) => error.code === "topic_not_supported");
-  assert.equal(llm.count("questions"), 2);
+  assert.equal(llm.count("questions"), 4, "one call per list, diagnostic then check, retried once");
   assert.equal(store.saved.size, 0);
 });
 
@@ -385,7 +386,7 @@ test("rejects a draft with more than two free_text questions per list", async ()
   const llm = makeFakeLlm({ questions: () => broken });
 
   await assert.rejects(generate({ llm, store: memoryStore() }), (error) => error.code === "topic_not_supported");
-  assert.equal(llm.count("questions"), 2);
+  assert.equal(llm.count("questions"), 4, "one call per list, diagnostic then check, retried once");
 });
 
 // --- self-consistency ----------------------------------------------------
@@ -425,7 +426,7 @@ test("reports topic_not_supported when too few questions survive, after one retr
   const store = memoryStore();
 
   await assert.rejects(generate({ llm, store }), (error) => error.code === "topic_not_supported");
-  assert.equal(llm.count("questions"), 2, "the whole draft is retried once");
+  assert.equal(llm.count("questions"), 4, "two list calls per attempt, the whole draft retried once");
   assert.equal(llm.count("selfcheck"), 28, "14 mcq checked on each attempt");
   assert.equal(store.saved.size, 0);
 });
@@ -573,7 +574,8 @@ test("accepts a topic of exactly 120 characters", async () => {
 test("prompts exist for every step", () => {
   const messages = prompts.conceptsMessages({ topic: "t", goal: "exam", sources: [] });
   assert.equal(messages.length, 2);
-  assert.ok(prompts.questionsMessages({ topic: "t", goal: "exam", sources: [], concepts: conceptFixture() }).length === 2);
+  assert.ok(prompts.questionListMessages({ topic: "t", goal: "exam", sources: [], concepts: conceptFixture(), section: "diagnostic" }).length === 2);
+  assert.ok(prompts.questionListMessages({ topic: "t", goal: "exam", sources: [], concepts: conceptFixture(), section: "check" }).length === 2);
   assert.ok(prompts.selfCheckMessages({ question: mcq("x1", 1) }).length === 2);
   assert.ok(prompts.topicCheckMessages({ topic: "t" }).length === 2);
 });
@@ -647,7 +649,7 @@ test("the concepts and questions drafts also ask for thinking off", async () => 
       ? "topiccheck"
       : text.includes('"answerIndex"')
         ? "selfcheck"
-        : text.includes('"diagnostic"')
+        : text.includes('"questions"')
           ? "questions"
           : "concepts";
     settingsByKind.set(kind, settings);

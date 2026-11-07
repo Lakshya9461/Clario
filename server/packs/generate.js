@@ -161,8 +161,19 @@ function conceptsMessages({ topic, goal, sources }) {
   ];
 }
 
-function questionsMessages({ topic, goal, sources, concepts }) {
+// One list per call. Drafting both lists in a single reply produces the largest stream in the
+// generation (~9k characters), which does not reliably finish inside the stream timeout on a
+// shared server: a slow moment loses the whole generation. Two half-size replies also give each
+// list's rules (diagnostic: no why/transfer; check: why at difficulty 2, transfer at 3) the
+// model's full attention, and a failed list costs one call to retry, not both.
+function questionListMessages({ topic, goal, sources, concepts, section }) {
   const conceptList = concepts.map((concept) => ({ id: concept.id, name: concept.name }));
+  const sectionRules =
+    section === "diagnostic"
+      ? ["Diagnostic questions: transfer false and requiresWhy false."]
+      : [
+          "Check questions: every difficulty-2 question has requiresWhy true and a rubric for the explanation; every difficulty-3 question has transfer true, applying the idea to a situation the student has not seen; every other check question has transfer false.",
+        ];
   return [
     { role: "system", content: QUESTIONS_SYSTEM },
     {
@@ -173,14 +184,13 @@ function questionsMessages({ topic, goal, sources, concepts }) {
         `<concept_list>${asData(JSON.stringify(conceptList))}</concept_list>`,
         sourceBlock(sources),
         "",
-        `Produce ${QUESTIONS_PER_LIST} diagnostic questions and ${QUESTIONS_PER_LIST} check questions (never more than ${MAX_QUESTIONS_PER_LIST} in a list).`,
-        `Each list: at least ${MIN_QUESTIONS_PER_TIER[0]} at difficulty 1, at least ${MIN_QUESTIONS_PER_TIER[1]} at difficulty 2, at least ${MIN_QUESTIONS_PER_TIER[2]} at difficulty 3.`,
-        "Diagnostic questions: transfer false and requiresWhy false.",
-        "Check questions: every difficulty-2 question has requiresWhy true and a rubric for the explanation; every difficulty-3 question has transfer true, applying the idea to a situation the student has not seen; every other check question has transfer false.",
-        'Each list has at least one and at most two "free_text" questions; the rest are "mcq". Omit fields that do not apply to the question kind.',
+        `Produce ${QUESTIONS_PER_LIST} ${section} questions (never more than ${MAX_QUESTIONS_PER_LIST} in this list).`,
+        `At least ${MIN_QUESTIONS_PER_TIER[0]} at difficulty 1, at least ${MIN_QUESTIONS_PER_TIER[1]} at difficulty 2, at least ${MIN_QUESTIONS_PER_TIER[2]} at difficulty 3.`,
+        ...sectionRules,
+        'At least one and at most two "free_text" questions; the rest are "mcq". Omit fields that do not apply to the question kind.',
         "",
         "Return:",
-        '{"diagnostic":[{"id":"...","kind":"mcq|free_text","prompt":"...","options":["a","b","c","d"],"correctOptionIndex":0,"conceptIds":["id"],"difficulty":1,"transfer":false,"requiresWhy":false,"rubric":"...","feedback":{"correct":"...","incorrect":"..."}}],"check":[...]}',
+        `{"questions":[{"id":"...","kind":"mcq|free_text","prompt":"...","options":["a","b","c","d"],"correctOptionIndex":0,"conceptIds":["id"],"difficulty":1,"transfer":false,"requiresWhy":false,"rubric":"...","feedback":{"correct":"...","incorrect":"..."}}]}`,
       ].join("\n"),
     },
   ];
@@ -205,7 +215,7 @@ function selfCheckMessages({ question }) {
   ];
 }
 
-const prompts = { conceptsMessages, questionsMessages, selfCheckMessages, topicCheckMessages };
+const prompts = { conceptsMessages, questionListMessages, selfCheckMessages, topicCheckMessages };
 
 // ---------------------------------------------------------------------------
 // Schemas (rule 2: every LLM reply is zod-validated)
@@ -242,9 +252,8 @@ const questionDraftSchema = z.object({
   }),
 });
 
-const questionsResponseSchema = z.object({
-  diagnostic: z.array(questionDraftSchema).min(QUESTIONS_PER_LIST).max(MAX_QUESTIONS_PER_LIST),
-  check: z.array(questionDraftSchema).min(QUESTIONS_PER_LIST).max(MAX_QUESTIONS_PER_LIST),
+const questionListResponseSchema = z.object({
+  questions: z.array(questionDraftSchema).min(QUESTIONS_PER_LIST).max(MAX_QUESTIONS_PER_LIST),
 });
 
 const selfCheckResponseSchema = z.object({ answerIndex: z.number().int().min(0).max(3) });
@@ -549,28 +558,36 @@ async function draftConcepts({ topic, goal, sources, chatJsonFn }) {
   return valid ? concepts : null;
 }
 
-async function draftQuestions({ topic, goal, sources, concepts, conceptIds, chatJsonFn }) {
+async function draftQuestionList({ section, topic, goal, sources, concepts, conceptIds, chatJsonFn }) {
   // Thinking off for the same reason as the concepts draft, and more so: this is the largest
   // reply in the generation, and with the server's thinking default its stream does not
   // finish inside the timeout at all — the run fails with generation_unavailable before any
   // question exists. Off completes in about a minute with the full list.
   const value = await askJson(
     chatJsonFn,
-    questionsMessages({ topic, goal, sources, concepts }),
-    questionsResponseSchema,
-    { diagnostic: [], check: [] },
+    questionListMessages({ topic, goal, sources, concepts, section }),
+    questionListResponseSchema,
+    { questions: [] },
     { reasoning: "off" }
   );
   if (!value) return null;
 
-  const diagnosticErrors = draftErrors(value.diagnostic, "diagnostic", conceptIds);
-  const checkErrors = draftErrors(value.check, "check", conceptIds);
-  if (diagnosticErrors.length || checkErrors.length) return null;
+  const errors = draftErrors(value.questions, section, conceptIds);
+  if (process.env.CLARIO_DEBUG_GEN) {
+    console.log(`[debug draftQuestionList ${section}] errors: ${JSON.stringify(errors)} size=${value.questions.length}`);
+  }
+  if (errors.length) return null;
 
-  return {
-    diagnostic: value.diagnostic.map((question, index) => ({ ...shuffleOptions(question), id: `d${index + 1}` })),
-    check: value.check.map((question, index) => ({ ...shuffleOptions(question), id: `c${index + 1}` })),
-  };
+  const prefix = section === "diagnostic" ? "d" : "c";
+  return value.questions.map((question, index) => ({ ...shuffleOptions(question), id: `${prefix}${index + 1}` }));
+}
+
+async function draftQuestions({ topic, goal, sources, concepts, conceptIds, chatJsonFn }) {
+  const diagnostic = await draftQuestionList({ section: "diagnostic", topic, goal, sources, concepts, conceptIds, chatJsonFn });
+  if (!diagnostic) return null;
+  const check = await draftQuestionList({ section: "check", topic, goal, sources, concepts, conceptIds, chatJsonFn });
+  if (!check) return null;
+  return { diagnostic, check };
 }
 
 // Step 4: ask the model to answer each mcq without the key; keep it only if it agrees.
@@ -637,7 +654,11 @@ async function draftSurvivingQuestions({ topic, goal, sources, concepts, concept
     drafted: { diagnostic: draft.diagnostic.length, check: draft.check.length },
     dropped: surviving.dropped,
   };
-  if (survivalErrors(surviving.diagnostic, surviving.check).length) {
+  const survival = survivalErrors(surviving.diagnostic, surviving.check);
+  if (process.env.CLARIO_DEBUG_GEN) {
+    console.log(`[debug draftSurvivingQuestions] dropped=${JSON.stringify(surviving.dropped)} kept=${surviving.diagnostic.length}+${surviving.check.length} survival errors=${JSON.stringify(survival)}`);
+  }
+  if (survival.length) {
     return { surviving: null, ...stats };
   }
   return { surviving, ...stats };
