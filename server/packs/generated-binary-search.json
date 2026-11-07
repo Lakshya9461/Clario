@@ -1,0 +1,470 @@
+{
+  "packId": "generated-090ae27620f1",
+  "topic": "Binary search",
+  "status": "generated",
+  "version": "0.1-beta",
+  "concepts": [
+    {
+      "id": "sorted_array",
+      "name": "Sorted Array",
+      "description": "An array where elements are arranged in ascending or descending order.",
+      "prerequisites": []
+    },
+    {
+      "id": "linear_search",
+      "name": "Linear Search",
+      "description": "A method of finding an element by checking each item sequentially until a match is found.",
+      "prerequisites": [
+        "sorted_array"
+      ]
+    },
+    {
+      "id": "index_range",
+      "name": "Index Range",
+      "description": "The subset of array indices currently being considered during the search process.",
+      "prerequisites": [
+        "sorted_array"
+      ]
+    },
+    {
+      "id": "midpoint_calculation",
+      "name": "Midpoint Calculation",
+      "description": "Finding the middle index of the current range to divide the search space in half.",
+      "prerequisites": [
+        "index_range"
+      ]
+    },
+    {
+      "id": "comparison_logic",
+      "name": "Comparison Logic",
+      "description": "Comparing the target value with the element at the midpoint to determine direction.",
+      "prerequisites": [
+        "midpoint_calculation"
+      ]
+    },
+    {
+      "id": "search_space_reduction",
+      "name": "Search Space Reduction",
+      "description": "Discarding half of the remaining elements based on the comparison result.",
+      "prerequisites": [
+        "comparison_logic",
+        "index_range"
+      ]
+    },
+    {
+      "id": "loop_condition",
+      "name": "Loop Condition",
+      "description": "The condition that continues the search while the range is valid and target not found.",
+      "prerequisites": [
+        "search_space_reduction"
+      ]
+    },
+    {
+      "id": "binary_search_algorithm",
+      "name": "Binary Search Algorithm",
+      "description": "The complete iterative or recursive process combining all previous steps to find a target.",
+      "prerequisites": [
+        "loop_condition",
+        "sorted_array"
+      ]
+    },
+    {
+      "id": "time_complexity",
+      "name": "Time Complexity",
+      "description": "Analysis of the algorithm's efficiency, typically O(log n) for binary search.",
+      "prerequisites": [
+        "binary_search_algorithm"
+      ]
+    },
+    {
+      "id": "edge_cases",
+      "name": "Edge Cases",
+      "description": "Handling scenarios like empty arrays, single elements, or targets not present in the array.",
+      "prerequisites": [
+        "binary_search_algorithm"
+      ]
+    }
+  ],
+  "diagnostic": [
+    {
+      "id": "d1",
+      "kind": "mcq",
+      "prompt": "What is the primary prerequisite for performing a binary search on an array?",
+      "conceptIds": [
+        "sorted_array"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The array must be sorted."
+      },
+      "fallbackFeedback": {
+        "correct": "Binary search relies on the sorted order to eliminate half of the remaining elements.",
+        "incorrect": "Binary search requires the data to be ordered to function correctly."
+      },
+      "options": [
+        "The array must be stored in contiguous memory.",
+        "The array must contain only integers.",
+        "The array must be sorted.",
+        "The array must have an even number of elements."
+      ]
+    },
+    {
+      "id": "d2",
+      "kind": "mcq",
+      "prompt": "In a standard binary search implementation, what is typically calculated first to determine where to look?",
+      "conceptIds": [
+        "midpoint_calculation"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The middle index of the current search range."
+      },
+      "fallbackFeedback": {
+        "correct": "Calculating the midpoint allows the algorithm to compare against the center element.",
+        "incorrect": "The algorithm starts by identifying the middle position of the current range."
+      },
+      "options": [
+        "The total number of comparisons needed.",
+        "The difference between the first and last element.",
+        "The average value of all elements in the array.",
+        "The middle index of the current search range."
+      ]
+    },
+    {
+      "id": "d3",
+      "kind": "mcq",
+      "prompt": "If the target value is less than the value at the midpoint, how does the search space change?",
+      "conceptIds": [
+        "search_space_reduction",
+        "comparison_logic"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The upper bound of the search range is updated to exclude the midpoint and right side."
+      },
+      "fallbackFeedback": {
+        "correct": "Since the target is smaller, only the left half remains relevant.",
+        "incorrect": "When the target is smaller than the midpoint, the right half can be eliminated."
+      },
+      "options": [
+        "The midpoint index is incremented by one without changing bounds.",
+        "The entire array is discarded and the search restarts from the beginning.",
+        "The lower bound of the search range is updated to exclude the midpoint and left side.",
+        "The upper bound of the search range is updated to exclude the midpoint and right side."
+      ]
+    },
+    {
+      "id": "d4",
+      "kind": "free_text",
+      "prompt": "Describe how the loop condition in a binary search algorithm determines when to stop searching.",
+      "conceptIds": [
+        "loop_condition"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "The loop runs as long as there are elements left in the current range.",
+        "incorrect": "The condition usually checks if the search range is still valid."
+      },
+      "rubric": "The answer must state that the loop continues while the lower index is less than or equal to the upper index (low <= high)."
+    },
+    {
+      "id": "d5",
+      "kind": "mcq",
+      "prompt": "What happens to the number of remaining candidates after each iteration of a successful binary search step?",
+      "conceptIds": [
+        "search_space_reduction"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "It is reduced by approximately half."
+      },
+      "fallbackFeedback": {
+        "correct": "Each step eliminates half of the remaining possibilities.",
+        "incorrect": "Binary search is efficient because it halves the problem size each time."
+      },
+      "options": [
+        "It is reduced by approximately half.",
+        "It decreases by exactly one element.",
+        "It remains constant until the target is found.",
+        "It doubles in size due to recursive calls."
+      ]
+    },
+    {
+      "id": "d6",
+      "kind": "mcq",
+      "prompt": "What is the worst-case time complexity of binary search on an array of size n?",
+      "conceptIds": [
+        "time_complexity"
+      ],
+      "difficulty": 3,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "O(log n)"
+      },
+      "fallbackFeedback": {
+        "correct": "Logarithmic complexity arises from halving the search space repeatedly.",
+        "incorrect": "Binary search is significantly faster than linear search in the worst case."
+      },
+      "options": [
+        "O(n)",
+        "O(n log n)",
+        "O(log n)",
+        "O(1)"
+      ]
+    },
+    {
+      "id": "d7",
+      "kind": "mcq",
+      "prompt": "Which of the following scenarios represents an edge case that might cause errors if not handled properly?",
+      "conceptIds": [
+        "edge_cases"
+      ],
+      "difficulty": 3,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "Searching for a value in an empty array."
+      },
+      "fallbackFeedback": {
+        "correct": "An empty array requires specific handling to avoid invalid index access.",
+        "incorrect": "Empty inputs are common edge cases that need explicit checks."
+      },
+      "options": [
+        "Searching for a value in an empty array.",
+        "Searching for a value present at the exact midpoint.",
+        "Searching for a duplicate value.",
+        "Searching for a value larger than all elements."
+      ]
+    },
+    {
+      "id": "d8",
+      "kind": "free_text",
+      "prompt": "Explain why integer overflow might be a concern when calculating the midpoint using (low + high) / 2, and suggest a safer alternative formula.",
+      "conceptIds": [
+        "midpoint_calculation"
+      ],
+      "difficulty": 3,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "Subtracting before adding prevents the sum from exceeding integer limits.",
+        "incorrect": "Using subtraction first avoids potential overflow issues in large arrays."
+      },
+      "rubric": "The answer must explain that low + high can exceed the maximum integer value causing overflow. A safe alternative is low + (high - low) / 2."
+    }
+  ],
+  "check": [
+    {
+      "id": "c1",
+      "kind": "mcq",
+      "prompt": "Which search algorithm checks every element in sequence until a match is found?",
+      "conceptIds": [
+        "linear_search"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "Linear Search"
+      },
+      "fallbackFeedback": {
+        "correct": "Linear search iterates through elements one by one.",
+        "incorrect": "Binary search skips sections of the array, whereas linear search does not."
+      },
+      "options": [
+        "Binary Search",
+        "Divide and Conquer",
+        "Linear Search",
+        "Hashing"
+      ]
+    },
+    {
+      "id": "c2",
+      "kind": "mcq",
+      "prompt": "What is the primary prerequisite for using binary search?",
+      "conceptIds": [
+        "sorted_array"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The array must be sorted."
+      },
+      "fallbackFeedback": {
+        "correct": "Binary search relies on the sorted order to eliminate half of the remaining elements.",
+        "incorrect": "Binary search requires the data to be sorted to function correctly."
+      },
+      "options": [
+        "The array must be sorted.",
+        "The array must have an even number of elements.",
+        "The array must contain unique values.",
+        "The array must be stored in a linked list."
+      ]
+    },
+    {
+      "id": "c3",
+      "kind": "mcq",
+      "prompt": "Why is binary search generally faster than linear search for large datasets?",
+      "conceptIds": [
+        "search_space_reduction",
+        "time_complexity"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": {
+        "type": "option",
+        "value": "It reduces the search space by half in each step."
+      },
+      "fallbackFeedback": {
+        "correct": "Binary search is faster because it halves the search space with each comparison.",
+        "incorrect": "Binary search efficiency comes from reducing the problem size exponentially, not just by skipping elements randomly."
+      },
+      "options": [
+        "It does not require sorting.",
+        "It uses more memory.",
+        "It always finds the element in the first position.",
+        "It reduces the search space by half in each step."
+      ],
+      "rubric": "The answer must explain that binary search eliminates half of the remaining candidates at each iteration, leading to logarithmic time complexity compared to linear search's linear scan."
+    },
+    {
+      "id": "c4",
+      "kind": "mcq",
+      "prompt": "In a standard binary search implementation, how is the midpoint index typically calculated to avoid integer overflow?",
+      "conceptIds": [
+        "midpoint_calculation"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": {
+        "type": "option",
+        "value": "low + (high - low) / 2"
+      },
+      "fallbackFeedback": {
+        "correct": "Using low + (high - low) / 2 is safer against integer overflow.",
+        "incorrect": "Adding low and high directly may cause overflow if the sum exceeds the maximum integer value."
+      },
+      "options": [
+        "low + (high - low) / 2",
+        "Math.floor((low + high) / 2)",
+        "high - (high - low) / 2",
+        "(low + high) / 2"
+      ],
+      "rubric": "The answer must identify that calculating the midpoint as low + (high - low) / 2 prevents potential integer overflow issues that could occur with (low + high) / 2 when indices are very large."
+    },
+    {
+      "id": "c5",
+      "kind": "free_text",
+      "prompt": "Describe how the search boundaries (low and high indices) are updated after comparing the middle element with the target value.",
+      "conceptIds": [
+        "comparison_logic",
+        "index_range"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "Boundaries are adjusted to exclude the half of the array that does not contain the target.",
+        "incorrect": "The boundaries must shift to the side where the target could still exist based on the comparison result."
+      },
+      "rubric": "The answer must state that if the middle element is less than the target, the low index is updated to mid + 1; if the middle element is greater than the target, the high index is updated to mid - 1."
+    },
+    {
+      "id": "c6",
+      "kind": "mcq",
+      "prompt": "A student implements binary search on a sorted array of 1024 elements. After how many comparisons is the target guaranteed to be found or determined absent?",
+      "conceptIds": [
+        "time_complexity",
+        "binary_search_algorithm"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "10"
+      },
+      "fallbackFeedback": {
+        "correct": "Since log2(1024) is 10, at most 10 comparisons are needed.",
+        "incorrect": "Binary search complexity is logarithmic, so the number of steps grows slowly with input size."
+      },
+      "options": [
+        "512",
+        "32",
+        "1024",
+        "10"
+      ]
+    },
+    {
+      "id": "c7",
+      "kind": "mcq",
+      "prompt": "Consider a binary search loop condition `while (low <= high)`. What happens if this is changed to `while (low < high)`?",
+      "conceptIds": [
+        "loop_condition",
+        "edge_cases"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The algorithm may fail to find the target if it is at the final remaining position."
+      },
+      "fallbackFeedback": {
+        "correct": "Using `low < high` might terminate before checking the last single element.",
+        "incorrect": "The loop condition must include equality to ensure the final candidate is checked."
+      },
+      "options": [
+        "The algorithm becomes infinite.",
+        "The algorithm runs faster.",
+        "The algorithm will always find the target.",
+        "The algorithm may fail to find the target if it is at the final remaining position."
+      ]
+    },
+    {
+      "id": "c8",
+      "kind": "free_text",
+      "prompt": "You are searching for a specific value in a sorted array using binary search. The target value is not present in the array. Explain what happens to the `low` and `high` pointers when the loop terminates.",
+      "conceptIds": [
+        "edge_cases",
+        "binary_search_algorithm"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "The pointers cross each other (low > high), signaling that no valid range remains for the target.",
+        "incorrect": "If the target is missing, the boundaries eventually cross, proving the element is not in the current search space."
+      },
+      "rubric": "The answer must explain that when the target is not found, the loop terminates because `low` becomes greater than `high`, indicating the search space has been exhausted without finding a match."
+    }
+  ],
+  "traces": {},
+  "sources": []
+}

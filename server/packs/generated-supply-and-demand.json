@@ -1,0 +1,494 @@
+{
+  "packId": "generated-9bfa39e7d682",
+  "topic": "Supply and demand",
+  "status": "generated",
+  "version": "0.1-beta",
+  "concepts": [
+    {
+      "id": "scarcity",
+      "name": "Scarcity",
+      "description": "The fundamental economic problem of having seemingly unlimited human wants in a world of limited resources.",
+      "prerequisites": []
+    },
+    {
+      "id": "market_definition",
+      "name": "Market Definition",
+      "description": "A mechanism or arrangement that allows buyers and sellers to exchange goods, services, or information.",
+      "prerequisites": [
+        "scarcity"
+      ]
+    },
+    {
+      "id": "demand_definition",
+      "name": "Demand Definition",
+      "description": "The quantity of a good that consumers are willing and able to purchase at various prices.",
+      "prerequisites": [
+        "market_definition"
+      ]
+    },
+    {
+      "id": "law_of_demand",
+      "name": "Law of Demand",
+      "description": "The principle that, all else being equal, as price increases, quantity demanded decreases.",
+      "prerequisites": [
+        "demand_definition"
+      ]
+    },
+    {
+      "id": "supply_definition",
+      "name": "Supply Definition",
+      "description": "The quantity of a good that producers are willing and able to sell at various prices.",
+      "prerequisites": [
+        "market_definition"
+      ]
+    },
+    {
+      "id": "law_of_supply",
+      "name": "Law of Supply",
+      "description": "The principle that, all else being equal, as price increases, quantity supplied increases.",
+      "prerequisites": [
+        "supply_definition"
+      ]
+    },
+    {
+      "id": "equilibrium_price",
+      "name": "Equilibrium Price",
+      "description": "The price point where the quantity demanded equals the quantity supplied in a market.",
+      "prerequisites": [
+        "law_of_demand",
+        "law_of_supply"
+      ]
+    },
+    {
+      "id": "surplus_deficit",
+      "name": "Surplus and Deficit",
+      "description": "Conditions where price is above or below equilibrium, causing excess supply or demand.",
+      "prerequisites": [
+        "equilibrium_price"
+      ]
+    },
+    {
+      "id": "shift_vs_movement",
+      "name": "Shift vs Movement",
+      "description": "The distinction between changing quantity due to price versus shifting the entire curve due to other factors.",
+      "prerequisites": [
+        "law_of_demand",
+        "law_of_supply"
+      ]
+    },
+    {
+      "id": "determinants_demand",
+      "name": "Determinants of Demand",
+      "description": "Factors such as income, preferences, and prices of related goods that shift the demand curve.",
+      "prerequisites": [
+        "shift_vs_movement"
+      ]
+    },
+    {
+      "id": "determinants_supply",
+      "name": "Determinants of Supply",
+      "description": "Factors such as production costs, technology, and number of sellers that shift the supply curve.",
+      "prerequisites": [
+        "shift_vs_movement"
+      ]
+    },
+    {
+      "id": "market_adjustment",
+      "name": "Market Adjustment",
+      "description": "The process by which markets return to equilibrium after a shock or shift in supply or demand.",
+      "prerequisites": [
+        "surplus_deficit",
+        "determinants_demand",
+        "determinants_supply"
+      ]
+    }
+  ],
+  "diagnostic": [
+    {
+      "id": "d1",
+      "kind": "mcq",
+      "prompt": "What does the term 'scarcity' mean in economics?",
+      "conceptIds": [
+        "scarcity"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "Resources are limited relative to human wants."
+      },
+      "fallbackFeedback": {
+        "correct": "Scarcity refers to the fundamental economic problem of having seemingly unlimited human wants in a world of limited resources.",
+        "incorrect": "This definition may confuse scarcity with inflation or government intervention."
+      },
+      "options": [
+        "Government controls all production.",
+        "Prices are always rising.",
+        "A good is available in unlimited quantities.",
+        "Resources are limited relative to human wants."
+      ]
+    },
+    {
+      "id": "d2",
+      "kind": "mcq",
+      "prompt": "Which statement best describes the Law of Demand?",
+      "conceptIds": [
+        "law_of_demand"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "As price increases, quantity demanded decreases."
+      },
+      "fallbackFeedback": {
+        "correct": "The Law of Demand states that there is an inverse relationship between price and quantity demanded.",
+        "incorrect": "This option may confuse the Law of Demand with the Law of Supply."
+      },
+      "options": [
+        "Supply always equals demand.",
+        "As price increases, quantity demanded decreases.",
+        "As price increases, quantity demanded increases.",
+        "Demand is unaffected by price changes."
+      ]
+    },
+    {
+      "id": "d3",
+      "kind": "mcq",
+      "prompt": "If the price of coffee beans rises significantly, what happens to the supply curve for coffee?",
+      "conceptIds": [
+        "determinants_supply",
+        "shift_vs_movement"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The supply curve shifts to the left."
+      },
+      "fallbackFeedback": {
+        "correct": "Higher input costs reduce profitability, causing suppliers to offer less at every price point, shifting the supply curve left.",
+        "incorrect": "This answer may confuse a shift in supply with a movement along the curve due to price changes."
+      },
+      "options": [
+        "The demand curve shifts to the left.",
+        "There is a movement along the supply curve.",
+        "The supply curve shifts to the left.",
+        "The supply curve shifts to the right."
+      ]
+    },
+    {
+      "id": "d4",
+      "kind": "mcq",
+      "prompt": "What occurs when the market price is set above the equilibrium price?",
+      "conceptIds": [
+        "equilibrium_price",
+        "surplus_deficit"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "A surplus exists."
+      },
+      "fallbackFeedback": {
+        "correct": "At prices above equilibrium, quantity supplied exceeds quantity demanded, creating a surplus.",
+        "incorrect": "This answer may confuse the effects of prices above equilibrium with those below it."
+      },
+      "options": [
+        "Quantity demanded equals quantity supplied.",
+        "A surplus exists.",
+        "A shortage (deficit) exists.",
+        "The demand curve shifts right."
+      ]
+    },
+    {
+      "id": "d5",
+      "kind": "free_text",
+      "prompt": "Explain the difference between a movement along the demand curve and a shift of the demand curve.",
+      "conceptIds": [
+        "shift_vs_movement"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "You correctly distinguished between price-induced movements and determinant-induced shifts.",
+        "incorrect": "This response may fail to distinguish between changes in price versus changes in other factors."
+      },
+      "rubric": "A full-credit answer must state that a movement along the curve is caused by a change in the good's own price, while a shift is caused by non-price determinants like income or preferences."
+    },
+    {
+      "id": "d6",
+      "kind": "mcq",
+      "prompt": "If consumer income increases for a normal good, what is the immediate effect on demand?",
+      "conceptIds": [
+        "determinants_demand",
+        "shift_vs_movement"
+      ],
+      "difficulty": 3,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The demand curve shifts to the right."
+      },
+      "fallbackFeedback": {
+        "correct": "For normal goods, higher income increases willingness and ability to buy at every price, shifting demand right.",
+        "incorrect": "This answer may confuse the effect of income changes with price-induced quantity changes."
+      },
+      "options": [
+        "There is a movement down along the demand curve.",
+        "Quantity demanded decreases due to higher prices.",
+        "The demand curve shifts to the right.",
+        "The supply curve shifts to the left."
+      ]
+    },
+    {
+      "id": "d7",
+      "kind": "mcq",
+      "prompt": "A new technology reduces the cost of producing smartphones. What is the likely impact on market equilibrium?",
+      "conceptIds": [
+        "determinants_supply",
+        "market_adjustment"
+      ],
+      "difficulty": 3,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "Equilibrium price falls, quantity rises."
+      },
+      "fallbackFeedback": {
+        "correct": "Lower production costs shift supply right, leading to a lower equilibrium price and higher equilibrium quantity.",
+        "incorrect": "This answer may misinterpret the direction of the supply shift or its impact on price."
+      },
+      "options": [
+        "Both price and quantity fall.",
+        "Equilibrium price falls, quantity rises.",
+        "Both price and quantity rise.",
+        "Equilibrium price rises, quantity falls."
+      ]
+    },
+    {
+      "id": "d8",
+      "kind": "free_text",
+      "prompt": "Describe how a market adjusts from a state of surplus to reach equilibrium.",
+      "conceptIds": [
+        "market_adjustment"
+      ],
+      "difficulty": 3,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "You accurately described the price mechanism clearing a surplus.",
+        "incorrect": "This response may overlook the role of price adjustments in balancing supply and demand."
+      },
+      "rubric": "A full-credit answer must explain that sellers lower prices to clear excess inventory, which increases quantity demanded and decreases quantity supplied until they are equal."
+    }
+  ],
+  "check": [
+    {
+      "id": "c1",
+      "kind": "mcq",
+      "prompt": "A venue has 500 seats and 2,000 people want tickets. Which term describes this situation?",
+      "conceptIds": [
+        "scarcity"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "A scarcity of tickets"
+      },
+      "fallbackFeedback": {
+        "correct": "Scarcity means wants exceed what is available: 2,000 people for 500 seats.",
+        "incorrect": "The seats are limited relative to the people who want them, which is scarcity, not a surplus or a price rule."
+      },
+      "options": [
+        "A surplus of tickets",
+        "An equilibrium price",
+        "A scarcity of tickets",
+        "A price ceiling"
+      ]
+    },
+    {
+      "id": "c2",
+      "kind": "mcq",
+      "prompt": "According to the Law of Demand, what happens when the price of a good increases, assuming all other factors remain constant?",
+      "conceptIds": [
+        "law_of_demand"
+      ],
+      "difficulty": 1,
+      "transfer": false,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The quantity demanded decreases."
+      },
+      "fallbackFeedback": {
+        "correct": "The Law of Demand states that higher prices lead to lower quantities demanded.",
+        "incorrect": "This option confuses movement along the curve with a shift in demand or supply."
+      },
+      "options": [
+        "Supply shifts to the left.",
+        "The quantity demanded increases.",
+        "The quantity demanded decreases.",
+        "Demand shifts to the right."
+      ]
+    },
+    {
+      "id": "c3",
+      "kind": "free_text",
+      "prompt": "Explain why an increase in consumer income leads to a shift in the demand curve rather than a movement along it, assuming the good is a normal good.",
+      "conceptIds": [
+        "shift_vs_movement",
+        "determinants_demand"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "Income is a non-price determinant, so it shifts the whole demand curve.",
+        "incorrect": "This explanation may confuse price changes with non-price determinants."
+      },
+      "rubric": "A full-credit answer must identify that income is a determinant of demand (not price) and explain that changing a non-price factor shifts the entire curve, whereas only price changes cause movement along the curve."
+    },
+    {
+      "id": "c4",
+      "kind": "mcq",
+      "prompt": "If the price of coffee beans (a key input for coffee) rises significantly, what is the immediate effect on the market for coffee?",
+      "conceptIds": [
+        "determinants_supply",
+        "shift_vs_movement"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": {
+        "type": "option",
+        "value": "The supply curve shifts to the left."
+      },
+      "fallbackFeedback": {
+        "correct": "Higher input costs reduce supply, shifting the curve left.",
+        "incorrect": "This option may confuse input costs with consumer preferences or price changes."
+      },
+      "options": [
+        "The supply curve shifts to the left.",
+        "The demand curve shifts to the right.",
+        "The equilibrium quantity increases.",
+        "There is a movement along the supply curve."
+      ],
+      "rubric": "A full-credit answer must identify that input costs are a determinant of supply, causing the supply curve to shift left (decrease), not just move along the curve."
+    },
+    {
+      "id": "c5",
+      "kind": "mcq",
+      "prompt": "At a price above equilibrium, what condition exists in the market?",
+      "conceptIds": [
+        "surplus_deficit",
+        "equilibrium_price"
+      ],
+      "difficulty": 2,
+      "transfer": false,
+      "requiresWhy": true,
+      "answerKey": {
+        "type": "option",
+        "value": "A surplus (excess supply)."
+      },
+      "fallbackFeedback": {
+        "correct": "Prices above equilibrium create a surplus because supply exceeds demand.",
+        "incorrect": "This option may confuse surplus with shortage or equilibrium conditions."
+      },
+      "options": [
+        "A shortage (excess demand).",
+        "Perfect elasticity.",
+        "A surplus (excess supply).",
+        "Market clearing."
+      ],
+      "rubric": "A full-credit answer must explain that at prices above equilibrium, quantity supplied exceeds quantity demanded, creating a surplus."
+    },
+    {
+      "id": "c6",
+      "kind": "mcq",
+      "prompt": "A new technology drastically reduces the cost of producing solar panels. Simultaneously, a government subsidy encourages consumers to buy them. What is the certain outcome for the market?",
+      "conceptIds": [
+        "determinants_supply",
+        "determinants_demand",
+        "equilibrium_price"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "The equilibrium quantity will definitely rise."
+      },
+      "fallbackFeedback": {
+        "correct": "Both supply increase and demand increase lead to a definite rise in equilibrium quantity.",
+        "incorrect": "This option may overlook that price changes are ambiguous when both curves shift."
+      },
+      "options": [
+        "The equilibrium quantity will definitely rise.",
+        "The equilibrium price will definitely fall.",
+        "The demand curve will shift left.",
+        "The equilibrium price will definitely rise."
+      ]
+    },
+    {
+      "id": "c7",
+      "kind": "free_text",
+      "prompt": "Imagine a sudden viral trend makes a specific brand of sneakers extremely popular, while at the same time, a factory fire destroys one of the major production facilities for those sneakers. Analyze the impact on equilibrium price and quantity.",
+      "conceptIds": [
+        "determinants_demand",
+        "determinants_supply",
+        "equilibrium_price"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": null,
+      "fallbackFeedback": {
+        "correct": "Demand up and supply down definitely raises price, but quantity is uncertain.",
+        "incorrect": "This analysis may fail to recognize the ambiguity of quantity when curves shift in opposite directions."
+      },
+      "rubric": "A full-credit answer must identify that demand increases (shift right) and supply decreases (shift left), leading to a definite increase in equilibrium price but an ambiguous change in quantity."
+    },
+    {
+      "id": "c8",
+      "kind": "mcq",
+      "prompt": "If the government imposes a strict quota on the number of cars that can be sold, how does this affect the market compared to a simple price ceiling?",
+      "conceptIds": [
+        "market_adjustment",
+        "surplus_deficit"
+      ],
+      "difficulty": 3,
+      "transfer": true,
+      "requiresWhy": false,
+      "answerKey": {
+        "type": "option",
+        "value": "It creates a shortage only if the quota is below equilibrium quantity."
+      },
+      "fallbackFeedback": {
+        "correct": "A quota below equilibrium quantity restricts supply, potentially creating a shortage or raising prices.",
+        "incorrect": "This option may confuse quotas with price ceilings or shifts in the curve."
+      },
+      "options": [
+        "It creates a shortage only if the quota is below equilibrium quantity.",
+        "It has no effect on the equilibrium price.",
+        "It eliminates the surplus entirely.",
+        "It shifts the supply curve vertically upward."
+      ]
+    }
+  ],
+  "traces": {},
+  "sources": []
+}
