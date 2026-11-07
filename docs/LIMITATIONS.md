@@ -58,8 +58,8 @@ verified against the code, with the file that causes it.
   the answer is `429 rate_limited` with a `Retry-After`. That is enough to stop one script burning the model queue,
   and not enough to stop a determined one: the count is per address (a campus behind one NAT
   shares an allowance, which is why the limit is generous), it is fixed-window rather than
-  smoothed, and the address comes from `X-Forwarded-For`, so it is only as honest as the proxy in
-  front. The JSON body is capped at 1 MB (`app.js`) and each answer at 4000 characters
+  smoothed, and the address is `req.ip` — the client only because `app.js` sets `trust proxy 1`
+  and the deployment publishes nothing but the proxy, so it is only as honest as that proxy. The JSON body is capped at 1 MB (`app.js`) and each answer at 4000 characters
   (`routes.js`). For a real deployment, put a proxy-side limit in front as well.
 - **Prompt injection is contained, not solved.** Student and source text is wrapped in tags and
   declared data (`server/data-tags.js`), and closing tags are escaped everywhere a string enters a
