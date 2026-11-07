@@ -58,7 +58,8 @@ Req: `{ "topic": string, "goal"?: string, "sourceText"?: string }`
 
 Res `201`: `{ sessionId, topic, packId, packStatus: "curated"|"generated", goal, firstQuestion: Question|null, done: boolean }`
 
-Errors: `400 source_text_not_supported`, `404 topic_not_available`.
+Errors: `400 invalid_topic` (empty, non-string, whitespace-only, or over 120 characters),
+`400 source_text_not_supported`, `404 topic_not_available`.
 
 ### POST /diagnose
 Answer or skip one diagnostic question.
@@ -124,14 +125,17 @@ out a check question.
 
 Answer mode — with `questionId`:
 Req: `{ "sessionId", "questionId", "answer": string, "why"?: string }`
-Res: `{ correct: boolean, feedback: string, nextQuestion: Question|null, checkComplete: boolean, degraded: boolean }`
+Res: `{ correct: boolean|null, selfReport: boolean, feedback: string, nextQuestion: Question|null, checkComplete: boolean, degraded: boolean }`
+- `correct` is `null` exactly when `selfReport` is `true`: the student rated themselves, so
+  there is no right answer to be right about. The client must not read `null` as "wrong".
 - The check is one question per difficulty tier, 1 → 3, three in total.
 - A written answer counts as `correct` only when every concept event the grader returned is
   `correct`; a partial answer is evidence, not a pass.
 - `answer` and `why` are each capped at 4000 characters.
 
 Errors: `400 invalid_answer`, `400 answer_too_long`, `400 question_not_found`,
-`404 session_not_found`, `409 question_already_answered`, `503 busy`.
+`404 session_not_found`, `404 topic_not_available` (the session's pack is gone),
+`409 question_already_answered`, `503 busy`.
 
 ### GET /model/:sessionId
 Read the derived learner model. Read-only in the beta.
@@ -158,7 +162,9 @@ Question = { id, kind: "mcq"|"predict_output"|"free_text", prompt, conceptIds: s
 TraceData = { code: string, steps: [{ stack: string[], output: string[], note: string }] }
 ```
 `publicQuestion()` in `engine/session.js` builds the client copy: it never includes `answerKey`,
-`rubric` or fallback feedback, so the answer never leaves the server.
+`rubric` or fallback feedback, so the answer never leaves the server. The pack's `selfReport` mark
+is one of those server-side facts: a self-report question looks like an ordinary one on screen, and
+the answer route reports `selfReport: true` with `correct: null` after it is answered.
 
 `options` are already in the order the student sees, and the key is the option *text* in that
 order, so grading can never disagree with the screen.
@@ -166,12 +172,13 @@ order, so grading can never disagree with the screen.
 ## Error codes
 | Status | `error` | When |
 | --- | --- | --- |
+| 400 | `invalid_topic` | `topic` is missing, not text, empty, or over 120 characters |
 | 400 | `invalid_answer` | no answer and no `skip: true` |
 | 400 | `answer_too_long` | `answer` or `why` over 4000 characters |
 | 400 | `question_not_found` | `questionId` is not in that pack section |
 | 400 | `step_not_found` | `stepIndex` is not a step of this plan |
 | 400 | `source_text_not_supported` | any non-empty `sourceText` |
-| 404 | `topic_not_available` | no curated or stored pack for that topic, or the session's pack is gone |
+| 404 | `topic_not_available` | no bundled or stored pack for that topic, or the session's pack is gone |
 | 404 | `session_not_found` | unknown or malformed `sessionId` |
 | 404 | `not_found` | no route for that method and path |
 | 409 | `question_already_answered` | the question was already claimed; nothing is graded twice |
