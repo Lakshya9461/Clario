@@ -7,7 +7,7 @@ must be run in each.
 ## Commands
 
 ```bash
-cd server && npm test          # node --test, every *.test.js (184 tests)
+cd server && npm test          # node --test, every *.test.js (200+ tests)
 cd server && node --test packs/generate.test.js            # one file
 cd server && node --test --test-name-pattern "cached pack" # one test
 cd client && npm run lint      # oxlint; npm run build. The client has no test suite.
@@ -57,8 +57,14 @@ generated pack.
   "may"/"could", never a claim about what the student does not understand.
 - No route generates a pack — generation is an offline script, so `POST /session` serves
   curated packs and already-generated ones and 404s `topic_not_available` otherwise.
-- No new dependencies without approval, and no features outside the documented phases
-  (no auth, uploads, web search, video).
+- **Student-owned data is readable only by its owner or an admin.** A session, its evidence and
+  its derived learner model belong to one student (`Session.owner`); every read path filters on
+  the caller, and an admin may read any. Never trust a `sessionId` on its own.
+- **Approved dependencies**: `bcryptjs`, `jsonwebtoken`, `cookie-parser`, `helmet` (server) and
+  `react-router-dom` (client). Anything else needs the user's approval first — no exceptions for
+  "it is only a dev tool".
+- No features outside the documented phases (no uploads, web search, video). Auth is required, not
+  optional: bcrypt password hashes, a JWT in an httpOnly cookie, and the roles `student`/`admin`.
 
 ## Testing shape
 
