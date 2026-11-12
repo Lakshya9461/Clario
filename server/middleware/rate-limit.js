@@ -10,6 +10,8 @@
 // is acceptable for what this protects. State is swept, because a map keyed by address that is
 // never pruned is a memory leak on a public port.
 
+const { readEnv } = require("../config/env");
+
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 60;
 // Past this many tracked addresses, drop the expired ones. Keeping the map bounded matters more
@@ -59,17 +61,10 @@ function rateLimit({ windowMs = WINDOW_MS, max = MAX_REQUESTS, now = Date.now } 
 
 // The allowance depends on the room, not on the code: a demo where several people share one
 // address (a campus or lab NAT) needs more than a single student does. Unset or unreadable keeps
-// the beta default.
-function positiveInt(value) {
-  const number = Number(value);
-  return Number.isInteger(number) && number > 0 ? number : undefined;
-}
-
+// the beta default, and the parsing itself lives in config/env.js.
 function limitFromEnv(env = process.env) {
-  return {
-    max: positiveInt(env.RATE_LIMIT_MAX),
-    windowMs: positiveInt(env.RATE_LIMIT_WINDOW_MS),
-  };
+  const { max, windowMs } = readEnv(env).rateLimit;
+  return { max, windowMs };
 }
 
 module.exports = { rateLimit, limitFromEnv, WINDOW_MS, MAX_REQUESTS };

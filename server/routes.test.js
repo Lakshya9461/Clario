@@ -7,7 +7,7 @@ const http = require("node:http");
 const express = require("express");
 const { createRouter } = require("./routes");
 const { LlmBusyError } = require("./llm");
-const { toHttpError } = require("./errors");
+const { toHttpError } = require("./middleware/error");
 const { makePack, makeSession, makeFakeChat, freeText } = require("./engine/fixtures");
 
 async function setup({ packOverrides = {}, replies = {}, chatJson, storedPacks = [] } = {}) {

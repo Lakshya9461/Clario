@@ -4,7 +4,7 @@ const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
 const app = require("./app");
-const { MAX_REQUESTS } = require("./rate-limit");
+const { MAX_REQUESTS } = require("./middleware/rate-limit");
 
 let base;
 const server = http.createServer(app);
