@@ -8,9 +8,15 @@
 //
 // No route generates a pack: generation takes minutes and a request may not (A3). An unprepared
 // topic is a 404, not a slow request.
+//
+// The R2 routes (a student's own session records, the admin pack shelf, the account list) always
+// mount `requireAuth`, whatever `protectAuth` says for the study routes: they read or write rows that
+// belong to one account, so there is no useful anonymous answer to give.
 
 const express = require("express");
-const { EvidenceEvent, Pack } = require("../models/models");
+const mongoose = require("mongoose");
+const { Session, EvidenceEvent, Pack } = require("../models/models");
+const { User } = require("../models/user");
 const { chatJson } = require("../llm");
 const topics = require("../controllers/topics");
 const session = require("../controllers/session");
@@ -18,6 +24,46 @@ const plan = require("../controllers/plan");
 const lesson = require("../controllers/lesson");
 const check = require("../controllers/check");
 const model = require("../controllers/model");
+const sessions = require("../controllers/sessions");
+const adminPacks = require("../controllers/admin-packs");
+const adminUsers = require("../controllers/admin-users");
+const auth = require("../controllers/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
+const { validate } = require("../middleware/validate");
+const { authRateLimit } = require("../middleware/auth-rate-limit");
+const { containsText, sameText } = require("../controllers/list-query");
+const { readEnv } = require("../config/env");
+
+// The filters a listing asks for, as Mongo queries. A controller hands over the values the query
+// string was validated into and knows nothing about how they are matched; an absent value adds no
+// clause at all, which is what keeps "no filter" from becoming "match nothing".
+function sessionFilter({ userId, topic, q }) {
+  return {
+    // Membership is part of the filter, never a field of the request.
+    userId,
+    ...(topic ? { topic: sameText(topic) } : {}),
+    ...(q ? { title: containsText(q) } : {}),
+  };
+}
+
+function packFilter({ q, status }) {
+  return {
+    ...(q ? { topic: containsText(q) } : {}),
+    // The review state lives inside the stored pack JSON, not on the row.
+    ...(status ? { "pack.status": status } : {}),
+  };
+}
+
+function userFilter({ q, role }) {
+  return {
+    ...(role ? { role } : {}),
+    ...(q
+      ? { $or: [{ name: containsText(q) }, { email: containsText(q) }] }
+      : {}),
+  };
+}
+
+const byNewest = { createdAt: -1 };
 
 const defaultDeps = {
   chatJson,
@@ -25,33 +71,124 @@ const defaultDeps = {
   countEvents: (sessionId) => EvidenceEvent.countDocuments({ sessionId }),
   insertEvents: (documents) => EvidenceEvent.insertMany(documents),
   listStored: () => Pack.find({}).lean(),
+  config: readEnv(),
+  findUserByEmail: (email, options = {}) => {
+    const query = User.findOne({ email: email.toLowerCase() });
+    return (options.includePassword ? query.select("+passwordHash") : query).lean();
+  },
+  findUserById: (id) => User.findById(id).lean(),
+  createUser: (doc) => User.create(doc),
+
+  listSessions: (query) =>
+    Session.find(sessionFilter(query))
+      .sort(byNewest)
+      .skip(query.skip)
+      .limit(query.limit)
+      .lean(),
+  countSessions: (query) => Session.countDocuments(sessionFilter(query)),
+  updateSession: (id, change) => Session.findByIdAndUpdate(id, change, { new: true }).lean(),
+  deleteSession: (id) => Session.findByIdAndDelete(id),
+  // Evidence belongs to one session; deleting the session takes its evidence with it.
+  deleteSessionEvents: (sessionId) => EvidenceEvent.deleteMany({ sessionId }),
+
+  listPacks: (query) =>
+    Pack.find(packFilter(query)).sort(byNewest).skip(query.skip).limit(query.limit).lean(),
+  countPacks: (query) => Pack.countDocuments(packFilter(query)),
+  // An id that cannot be an ObjectId is a 404, not a cast error on the way to the database.
+  findPackById: (id) => (mongoose.isValidObjectId(id) ? Pack.findById(id).lean() : null),
+  findPackByKey: (topicKey) => Pack.findOne({ topicKey }).lean(),
+  insertPack: (doc) => Pack.create(doc),
+  updatePack: (id, change) => Pack.findByIdAndUpdate(id, change, { new: true }).lean(),
+  deletePack: (id) => Pack.findByIdAndDelete(id),
+
+  listUsers: (query) =>
+    User.find(userFilter(query)).sort(byNewest).skip(query.skip).limit(query.limit).lean(),
+  countUsers: (query) => User.countDocuments(userFilter(query)),
+  updateUserRole: (id, role) =>
+    mongoose.isValidObjectId(id) ? User.findByIdAndUpdate(id, { role }, { new: true }).lean() : null,
 };
 
 function createRouter(overrides = {}) {
-  const deps = { ...defaultDeps, ...overrides };
+  const { protectAuth = false, ...dependencyOverrides } = overrides;
+  const deps = { ...defaultDeps, ...dependencyOverrides };
   const router = express.Router();
+  const authHandlers = auth.create(deps);
+
+  router.post("/auth/register", authRateLimit(), authHandlers.register);
+  router.post("/auth/login", authRateLimit(), authHandlers.login);
+  router.post("/auth/logout", authHandlers.logout);
+  router.get("/auth/me", requireAuth({ config: deps.config }), authHandlers.me);
+
+  const studyRouter = express.Router();
 
   // What a student can start, curated first, without calling the model.
-  router.get("/topics", topics.list(deps));
+  studyRouter.get("/topics", topics.list(deps));
+
+  const protectedRouter = express.Router();
+  const guard = protectAuth ? requireAuth({ config: deps.config }) : (req, res, next) => next();
 
   // Start a session on a pack that already exists.
-  router.post("/session", session.create(deps));
+  protectedRouter.post("/session", guard, session.create(deps));
 
   // Answer or skip one diagnostic question.
-  router.post("/diagnose", session.diagnose(deps));
+  protectedRouter.post("/diagnose", guard, session.diagnose(deps));
 
   // The plan, recomputed from evidence on every call.
-  router.get("/plan/:sessionId", plan.read(deps));
+  protectedRouter.get("/plan/:sessionId", guard, plan.read(deps));
 
   // One lesson for one plan step.
-  router.post("/lesson", lesson.read(deps));
+  protectedRouter.post("/lesson", guard, lesson.read(deps));
 
   // The check: fetch the next question, or answer one.
-  router.post("/check", check.read(deps));
+  protectedRouter.post("/check", guard, check.read(deps));
 
   // The derived learner model.
-  router.get("/model/:sessionId", model.read(deps));
+  protectedRouter.get("/model/:sessionId", guard, model.read(deps));
 
+  // --- the student's own session records ----------------------------------
+  // All four are filtered on the caller, so a sessionId is never enough on its own.
+  const signedIn = requireAuth({ config: deps.config });
+
+  router.get(
+    "/sessions",
+    signedIn,
+    validate(sessions.listQuerySchema, { source: "query" }),
+    sessions.list(deps)
+  );
+  router.get("/sessions/:id", signedIn, sessions.read(deps));
+  router.patch("/sessions/:id", signedIn, validate(sessions.titleSchema), sessions.rename(deps));
+  router.delete("/sessions/:id", signedIn, sessions.remove(deps));
+
+  // --- the admin shelf ----------------------------------------------------
+  const adminOnly = [signedIn, requireRole("admin")];
+
+  router.get(
+    "/admin/packs",
+    adminOnly,
+    validate(adminPacks.listQuerySchema, { source: "query" }),
+    adminPacks.list(deps)
+  );
+  router.post("/admin/packs", adminOnly, adminPacks.create(deps));
+  router.get("/admin/packs/:id", adminOnly, adminPacks.read(deps));
+  router.put("/admin/packs/:id", adminOnly, adminPacks.replace(deps));
+  router.post("/admin/packs/:id/approve", adminOnly, adminPacks.approve(deps));
+  router.delete("/admin/packs/:id", adminOnly, adminPacks.remove(deps));
+
+  router.get(
+    "/admin/users",
+    adminOnly,
+    validate(adminUsers.listQuerySchema, { source: "query" }),
+    adminUsers.list(deps)
+  );
+  router.patch(
+    "/admin/users/:id/role",
+    adminOnly,
+    validate(adminUsers.roleSchema),
+    adminUsers.changeRole(deps)
+  );
+
+  router.use(studyRouter);
+  router.use(protectedRouter);
   return router;
 }
 

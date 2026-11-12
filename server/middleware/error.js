@@ -11,8 +11,14 @@ const INTERNAL_MESSAGE = "Something went wrong.";
 function toHttpError(error) {
   const status = error.status || error.statusCode || 500;
 
+  // `details` is the one structured extension the contract allows: a validator that refused a pack
+  // can name every reason, which is what makes a 422 actionable for the admin who imported it. It is
+  // only ever read from an exposing error, so an internal failure still says nothing but "server_error".
   if (error.expose && error.code) {
-    return { status, body: { error: error.code, message: error.message } };
+    return {
+      status,
+      body: { error: error.code, message: error.message, ...(error.details ?? {}) },
+    };
   }
   if (status >= 500) {
     return { status, body: { error: "server_error", message: INTERNAL_MESSAGE } };
