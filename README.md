@@ -24,9 +24,18 @@ cd server && npm install && cp .env.example .env   # then fill in .env
 cd ../client && npm install
 ```
 
-`.env` lives only in `server/` and is git-ignored. Keys: `PORT`, `MONGO_URL`,
-`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_MS`, `CLIENT_ORIGIN`,
-`RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`.
+`.env` lives only in `server/` and is git-ignored; `server/.env.example` lists every variable with
+its default. `MONGO_URL` and `JWT_SECRET` are required and the server refuses to start without
+them, naming the missing variable and never printing its value. `JWT_SECRET` signs the httpOnly
+session cookie and must be at least 32 characters:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
+```
+
+The rest: `PORT`, `NODE_ENV`, `JWT_EXPIRES_IN`, `COOKIE_SECURE`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_TIMEOUT_MS`, `CLIENT_ORIGIN`, `RATE_LIMIT_MAX`,
+`RATE_LIMIT_WINDOW_MS`. Every one is parsed in `server/config/env.js` and nowhere else.
 `LLM_TIMEOUT_MS` is optional (default 90000) and caps one completion, streaming included.
 `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS` are optional (default 60 requests per 60000 ms):
 raise them when several people share one address, such as a campus or lab NAT.

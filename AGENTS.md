@@ -4,6 +4,22 @@ Two independent packages, no root manifest and no shared code: `server/` (Common
 Express + Mongoose + zod + dotenv) and `client/` (ESM, React 19 + Vite). `npm install`
 must be run in each.
 
+## Layout
+
+`server/` keeps one job per directory:
+
+| Path | Holds |
+| --- | --- |
+| `config/` | `env.js` — every `process.env` read, parsed once into one object, plus the boot gate that refuses to start without `MONGO_URL` and `JWT_SECRET`. `db.js` — the Mongo connection and `redactUrl()`. |
+| `middleware/` | `error.js` (the JSON 404, the central error handler, `toHttpError()`), `validate.js` (`validate(schema)` with zod, for a body or a params source), `rate-limit.js`. |
+| `controllers/` | one module per resource — `topics`, `session` (create + diagnose), `plan`, `lesson`, `check`, `model` — plus the shared answer path (`answers.js`), evidence writing (`evidence.js`) and the derived learner view (`learner-view.js`). |
+| `routes/` | `index.js` — the route table and the composition root (`defaultDeps`). Nothing else. |
+| `models/` | `models.js` — the Mongoose schemas and `computeEstimate()`. |
+| `engine/`, `packs/`, `llm.js`, `data-tags.js`, `scripts/` | the deterministic engine, topic packs, the LLM client, prompt tagging, offline scripts. |
+
+A handler never imports Mongoose or `llm.js`: it receives `deps`. A new route is a controller
+function plus one line in `routes/index.js`.
+
 ## Commands
 
 ```bash
@@ -26,8 +42,12 @@ generated pack.
 - Open the client at `http://localhost:5173`, **not** `http://127.0.0.1:5173`. The CORS
   allowlist is `CLIENT_ORIGIN` (default `http://localhost:5173`), so the other origin is
   dropped and reads as "Cannot reach the Clario server".
+- Nothing outside `config/env.js` reads `process.env`. A new setting is added there (with its
+  default and, if the app cannot invent it, to the boot gate) and to `server/.env.example`.
+  `index.js` refuses to start without `MONGO_URL` and a `JWT_SECRET` of at least 32 characters,
+  and its message names variables only — never a value.
 - `.env` exists only in `server/` and is git-ignored. A Mongo URL must never reach a log
-  unredacted — use `redactUrl()` in `server/db.js`.
+  unredacted — use `redactUrl()` in `config/db.js`.
 - Every LLM call goes through `server/llm.js` and **streams**. A non-streaming call is
   killed by the proxy in front of the model after ~100 s of silence, so `stream: true` is
   not an optimization, it is the requirement. `LLM_TIMEOUT_MS` defaults to 90000.
@@ -68,9 +88,9 @@ generated pack.
 
 ## Testing shape
 
-`createRouter(overrides)` takes its dependencies (`chatJson`, `findEvents`, `insertEvents`,
-`curatedPacks`, `findStored`, `claim`, …) so tests drive real HTTP over the same handlers
-with fakes. Do not hardwire Mongoose or `llm.js` inside a handler — that breaks the tests.
+`createRouter(overrides)` in `server/routes/index.js` takes its dependencies (`chatJson`, `findEvents`,
+`insertEvents`, `curatedPacks`, `findStored`, `claim`, …) so tests drive real HTTP over the same handlers
+with fakes. Do not hardwire Mongoose or `llm.js` inside a handler or a controller — that breaks the tests.
 
 `server/engine/fixtures.js` is not a `*.test.js` file, so `node --test` does not run it on
 its own; its content is deliberately subject-free, which is what proves the engine needs no
