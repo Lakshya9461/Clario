@@ -42,7 +42,8 @@ generated pack.
 - Open the client at `http://localhost:5173`, **not** `http://127.0.0.1:5173`. The CORS
   allowlist is `CLIENT_ORIGIN` (default `http://localhost:5173`), so the other origin is
   dropped and reads as "Cannot reach the Clario server".
-- Nothing outside `config/env.js` reads `process.env`. A new setting is added there (with its
+- Nothing outside `config/env.js` parses `process.env`: other modules hand it to `readEnv()`, and
+  the operator scripts read their own flags. A new setting is added in `config/env.js` (with its
   default and, if the app cannot invent it, to the boot gate) and to `server/.env.example`.
   `index.js` refuses to start without `MONGO_URL` and a `JWT_SECRET` of at least 32 characters,
   and its message names variables only — never a value.
