@@ -669,3 +669,397 @@ textarea {
   font-size: 0.85rem;
   color: var(--ink-soft);
 }
+
+/* ---------- layout ---------- */
+
+.layout {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+.layout__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+
+.layout__brand {
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.layout__nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.layout__main {
+  padding: 2rem 1.5rem 4rem;
+  max-width: 42rem;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ---------- auth ---------- */
+
+.auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem 1rem;
+}
+
+.auth__card {
+  max-width: 28rem;
+  width: 100%;
+  padding: 2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.auth__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.auth__lede {
+  margin: 0 0 1.5rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.auth__form {
+  display: grid;
+  gap: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.field__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--error);
+}
+
+.auth__switch {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.auth__hint {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  text-align: center;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+/* ---------- topics ---------- */
+
+.topics__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.topics__lede {
+  margin: 0 0 1.5rem;
+  color: var(--ink-soft);
+}
+
+.topics__list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topic.choice {
+  width: 100%;
+  text-align: left;
+}
+
+/* ---------- sessions ---------- */
+
+.sessions__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.sessions__lede {
+  margin: 0 0 1.5rem;
+  color: var(--ink-soft);
+}
+
+.sessions__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.sessions__table th,
+.sessions__table td {
+  text-align: left;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sessions__table th {
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sessions__th-action {
+  text-align: right;
+}
+
+.sessions__action {
+  text-align: right;
+}
+
+/* ---------- learn ---------- */
+
+.learn__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+.learn__brand {
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.learn__topic {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* ---------- admin ---------- */
+
+.admin__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.admin__lede {
+  margin: 0 0 1.5rem;
+  color: var(--ink-soft);
+}
+
+.admin__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.admin__table th,
+.admin__table td {
+  text-align: left;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin__table th {
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin__row {
+  display: table-row;
+}
+
+.admin__pack-id {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.admin__status,
+.admin__role {
+  font-size: 0.8rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.badge--admin {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.badge--student {
+  border-color: var(--border);
+  color: var(--ink-soft);
+}
+
+.badge--curated {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.badge--generated {
+  border-color: var(--ink-soft);
+  color: var(--ink-soft);
+}
+
+.admin__hint {
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* ---------- not found ---------- */
+
+.not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.not-found__title {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+}
+
+.not-found__lede {
+  margin: 0 0 1.5rem;
+  color: var(--ink-soft);
+  max-width: 28rem;
+}
+
+.not-found__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- empty states ---------- */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.empty__text {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.empty__hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 640px) {
+  .layout__header {
+    padding: 0.75rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .layout__nav {
+    justify-content: center;
+  }
+
+  .layout__main {
+    padding: 1rem 1rem 3rem;
+  }
+
+  .auth__card {
+    padding: 1.5rem;
+  }
+
+  .progress {
+    gap: 0.4rem;
+    font-size: 0.7rem;
+  }
+
+  .step {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .lesson__table,
+  .trace__table,
+  .sessions__table,
+  .admin__table {
+    font-size: 0.8rem;
+  }
+
+  .sessions__table th,
+  .sessions__table td,
+  .admin__table th,
+  .admin__table td {
+    padding: 0.45rem 0.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .busy__dot {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+

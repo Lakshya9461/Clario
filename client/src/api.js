@@ -85,4 +85,8 @@ export const api = {
   topics: () => get("/topics"),
 
   model: (sessionId) => get(`/model/${encodeURIComponent(sessionId)}`),
+
+  // Admin analytics overview: sessions trend, evidence quality, topic popularity,
+  // concept outcomes. Admin-only on the server; mocked here until the endpoint is online.
+  analyticsOverview: () => get("/admin/analytics/overview"),
 };

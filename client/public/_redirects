@@ -1,0 +1,3 @@
+# Netlify SPA fallback: rewrite every request to index.html so
+# client-side deep links (e.g. /learn/:sessionId, /admin/analytics) work.
+/*    /index.html   200

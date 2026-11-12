@@ -31,6 +31,12 @@ export const GOALS = [
   { value: "curiosity", label: "curiosity" },
 ];
 
+// A4: an assistant-written pack is weaker evidence than a reviewed one.
+export function sourceLabel(entry) {
+  if (entry.source === "curated") return "reviewed";
+  return entry.reviewed ? "assistant-written, key-checked" : "assistant-written, unreviewed";
+}
+
 export function kindLabel(question) {
   switch (question.kind) {
     case "mcq":
