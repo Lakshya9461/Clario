@@ -10,13 +10,14 @@ JSON pack from `server/packs/` or on a pack an offline generation run stored in 
 endpoint generates a pack** — generation takes minutes (`server/packs/generate.js`, run from
 `scripts/generate-preview.js`), so an unprepared topic is a 404, not a slow request.
 
-This document describes Phase 3 as implemented. Where it disagrees with an amendment in the
-README (A1–A5), the amendment wins.
+This document describes the current API, including authentication and the admin pack, user, and
+analytics endpoints. Where it disagrees with an amendment in the README (A1–A5), the amendment
+wins.
 
 ## Rules the code enforces
 
 1. The LLM never writes an estimate, a status or a confidence. It may propose evidence events;
-   `appendEvents()` in `routes.js` drops any event whose `conceptId` is not in the pack.
+   the evidence controller drops any event whose `conceptId` is not in the pack.
 2. Estimates are derived per request by `computeEstimate()` in `server/models/models.js` and are
    never stored.
 3. Evidence is append-only. There is no update route; the only deletions are the owner deleting
@@ -36,6 +37,62 @@ README (A1–A5), the amendment wins.
 
 All requests and responses are JSON. The client origin must be listed in `CLIENT_ORIGIN`
 (exact match, no wildcard) or the browser request is refused by CORS.
+JSON date fields (`createdAt`, `reviewedAt`) are serialized as ISO 8601 strings. MongoDB IDs are
+serialized as strings. List responses use `ListEnvelope<T>` defined below.
+
+Except for `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /topics`, and
+`GET /health`, routes require the `clario_token` httpOnly cookie. Login and registration set the
+cookie; logout clears it. Cookie `Secure` and `SameSite` settings follow server configuration.
+Successful authenticated responses never include the JWT. A missing, invalid, or expired cookie
+returns `401 unauthorized`. A student calling an admin route receives `403 forbidden`.
+
+### POST /auth/register
+Create a student account and sign in immediately.
+
+Req: `{ "name": string, "email": string, "password": string }`. Name is trimmed and 1–120
+characters; email is trimmed, validated, and lowercased; password is 8–200 characters. Extra keys
+such as `role` are ignored; the new role is always `student`.
+
+Res `201`: `{ "user": { "id": string, "name": string, "email": string, "role": "student",
+"createdAt": date } }`, plus `Set-Cookie: clario_token=...; HttpOnly; Path=/` with configured
+SameSite/Secure attributes. The password and password hash are never returned.
+
+Errors: `400 invalid_auth`, `409 email_taken`, `429 rate_limited`.
+
+### POST /auth/login
+Authenticate using email and password.
+
+Req: `{ "email": string, "password": string }`. Email is trimmed and lowercased; password is
+1–200 characters.
+
+Res `200`: `{ "user": { "id": string, "name": string, "email": string,
+"role": "student"|"admin", "createdAt": date } }`, plus the `clario_token` cookie described
+above.
+
+Errors: `400 invalid_auth`, `401 invalid_credentials` (same response for an unknown email or a
+wrong password), `429 rate_limited`.
+
+### POST /auth/logout
+Clear the session cookie. Authentication is not required, so callers can always sign out.
+
+Req: no body.
+Res `204`: empty body, plus `Set-Cookie` clearing `clario_token`.
+
+### GET /auth/me
+Return the signed-in caller's public account.
+
+Req: no body.
+Res `200`: `{ "user": { "id": string, "name": string, "email": string,
+"role": "student"|"admin", "createdAt": date } }`.
+
+Errors: `401 unauthorized`.
+
+### Authentication rate limits
+`POST /auth/register` and `POST /auth/login` allow five failed requests per client address per
+15-minute window. A sixth blocked request returns `429 { "error": "rate_limited", "message":
+"Too many failed authentication attempts." }` and a `Retry-After` header in seconds. Successful
+requests do not consume a failure slot. These routes are also subject to the global API limiter
+described under `GET /health`.
 
 ### GET /topics
 What a student can start right now, so the client can offer choices instead of a 404.
@@ -211,6 +268,11 @@ Errors: `401 unauthorized`, `403 forbidden`, `404 pack_not_found`.
 Import a pack JSON. The body must pass `validatePack` as a **generated** draft — `status` in the body
 is ignored, so a body cannot approve itself.
 
+Req: one full `PackDocument` object (defined under Shared types), not wrapped in a `pack` property.
+The server forces its `status` to `generated` before validation and storage.
+
+Res `201`: `{ "pack": PackSummary }`.
+
 Res `201`: `{ "pack": PackSummary }`.
 
 Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request`,
@@ -220,6 +282,9 @@ Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request`,
 ### PUT /admin/packs/:id
 Replace a stored pack. Re-validated as a draft, exactly like the import: `packId` cannot change,
 `topicKey` is recomputed, and **an earlier approval is cleared** (the reviewed bytes are gone).
+
+Req: one full `PackDocument` object, same shape and validation as `POST /admin/packs`.
+Res `200`: `{ "pack": PackSummary & { "pack": PackDocument } }`.
 
 Res `200`: `{ "pack": PackSummary & { pack: <full pack JSON> } }`.
 
@@ -266,7 +331,7 @@ Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request` (any other `r
 The numbers behind the admin dashboard. Nothing is stored: every figure is derived per request from
 what is already in Mongo. Admin-only, like every `/admin/*` route.
 
-Req query: `topic?` (substring-free, spells a topic as its pack stores it; 1–120 characters). When
+Req query: `topic?` (substring-free, spells a topic as its pack stores it; 1–100 characters). When
 omitted, the outcome table uses the topic with the most sessions.
 
 Res `200`:
@@ -295,6 +360,11 @@ Errors: `401 unauthorized`, `403 forbidden` (a student), `400 invalid_request`,
 ### GET /health
 Res `200`: `{ "status": "ok" }`. Used by the container healthcheck.
 
+The global limiter allows 60 requests per client address per 60,000 ms by default. It applies to
+all API routes except `/health`; `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS` configure it. On limit,
+the server returns `429 { "error": "rate_limited", "message": string }` and a `Retry-After`
+header in seconds. CORS preflight requests do not consume a request slot.
+
 ## Shared types
 ```
 Question = { id, kind: "mcq"|"predict_output"|"free_text", prompt, conceptIds: string[],
@@ -302,6 +372,21 @@ Question = { id, kind: "mcq"|"predict_output"|"free_text", prompt, conceptIds: s
              options?: string[], code?: string }
 TraceData = { code: string, steps: [{ stack: string[], output: string[], note: string }] }
 ListEnvelope = { items: T[], page: number, limit: number, total: number, totalPages: number }
+Concept = { id: string, name: string, description: string, prerequisites: string[] }
+PackQuestion = { id: string, kind: "mcq"|"predict_output"|"free_text", prompt: string,
+                 code?: string, options?: string[], conceptIds: string[], difficulty: 1|2|3,
+                 transfer: boolean, requiresWhy: boolean,
+                 answerKey: { type: string, value: unknown }|null, selfReport?: boolean,
+                 rubric?: string, fallbackFeedback: { correct: string, incorrect: string },
+                 optionHints?: Record<string, string> }
+Source = { id: string, title: string, url: string, license: string, text: string }
+PackDocument = { packId: string, topic: string, status: "generated"|"curated", version: string,
+                 concepts: Concept[], diagnostic: PackQuestion[], check: PackQuestion[],
+                 traces: Record<string, TraceData>, sources: Source[] }
+PackSummary = { id: string, packId: string, topic: string, topicKey: string,
+                status: "generated"|"curated", version: string, conceptCount: number,
+                questionCount: number, reviewedBy: string|null, reviewedAt: string|null,
+                createdAt: string }
 ```
 `publicQuestion()` in `engine/session.js` builds the client copy: it never includes `answerKey`,
 `rubric` or fallback feedback, so the answer never leaves the server. The pack's `selfReport` mark
