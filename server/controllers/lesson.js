@@ -12,7 +12,12 @@ const { learnerByConcept } = require("./learner-view");
 function read(deps) {
   return async function readLesson(req, res) {
     const { sessionId, stepIndex } = req.body ?? {};
-    const { session, pack } = await loadSession({ sessionId, deps });
+    const { session, pack } = await loadSession({
+      sessionId,
+      userId: req.user?.sub,
+      isAdmin: req.user?.role === "admin",
+      deps,
+    });
     const events = await deps.findEvents(String(session._id));
     const step = stepAt(planSteps(pack, events), stepIndex);
     const concept = pack.concepts.find((entry) => entry.id === step.conceptId);

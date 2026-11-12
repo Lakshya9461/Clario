@@ -24,7 +24,12 @@ const { appendEvents } = require("./evidence");
 function read(deps) {
   return async function checkAnswer(req, res) {
     const { sessionId, questionId, answer, why } = req.body ?? {};
-    const { session, pack } = await loadSession({ sessionId, deps });
+    const { session, pack } = await loadSession({
+      sessionId,
+      userId: req.user?.sub,
+      isAdmin: req.user?.role === "admin",
+      deps,
+    });
 
     if (questionId === undefined || questionId === null) {
       const answered = session.answeredQuestionIds || [];

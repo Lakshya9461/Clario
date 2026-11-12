@@ -25,7 +25,7 @@ function create(deps) {
     const { topic, goal, sourceText } = req.body ?? {};
     if (typeof sourceText === "string" && sourceText.trim()) throw new SourceTextNotSupportedError();
 
-    const { session, pack } = await createSession({ topic, goal, deps });
+    const { session, pack } = await createSession({ topic, goal, userId: req.user?.sub, deps });
     const firstQuestion = nextDiagnosticQuestion(pack, session.answeredQuestionIds);
 
     res.status(201).json({
@@ -43,7 +43,12 @@ function create(deps) {
 function diagnose(deps) {
   return async function diagnoseHandler(req, res) {
     const { sessionId, questionId, answer, skip } = req.body ?? {};
-    const { session, pack } = await loadSession({ sessionId, deps });
+    const { session, pack } = await loadSession({
+      sessionId,
+      userId: req.user?.sub,
+      isAdmin: req.user?.role === "admin",
+      deps,
+    });
     const question = findQuestion(pack, "diagnostic", questionId);
     const isSkip = skip === true;
     const answerText = isSkip ? "" : requireAnswer(answer);

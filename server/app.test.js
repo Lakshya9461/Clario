@@ -16,6 +16,17 @@ before(async () => {
 
 after(() => server.close());
 
+test("CORS allows only the configured exact origin and applies Helmet defaults", async () => {
+  const allowed = await get("/health", { Origin: "http://localhost:5173" });
+  assert.equal(allowed.headers.get("access-control-allow-origin"), "http://localhost:5173");
+  assert.equal(allowed.headers.get("access-control-allow-credentials"), "true");
+  assert.ok(allowed.headers.get("x-content-type-options"));
+
+  const rejected = await get("/health", { Origin: "https://untrusted.example" });
+  assert.equal(rejected.headers.get("access-control-allow-origin"), null);
+  assert.notEqual(rejected.headers.get("access-control-allow-origin"), "*");
+});
+
 const get = (path, headers = {}) => fetch(`${base}${path}`, { headers });
 
 test("health answers, and keeps answering while the caller is being limited", async () => {

@@ -6,7 +6,12 @@ const { learnerByConcept } = require("./learner-view");
 
 function read(deps) {
   return async function readModel(req, res) {
-    const { session, pack } = await loadSession({ sessionId: req.params.sessionId, deps });
+    const { session, pack } = await loadSession({
+      sessionId: req.params.sessionId,
+      userId: req.user?.sub,
+      isAdmin: req.user?.role === "admin",
+      deps,
+    });
     const events = await deps.findEvents(String(session._id));
 
     res.json({

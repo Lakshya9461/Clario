@@ -47,6 +47,7 @@ const schema = z.object({
   JWT_SECRET: z.string().catch(""),
   JWT_EXPIRES_IN: z.string().trim().min(1).catch(DEFAULT_JWT_EXPIRES_IN),
   COOKIE_SECURE: flag,
+  COOKIE_SAME_SITE: z.enum(["lax", "none"]).optional().catch(undefined),
   ADMIN_EMAIL: z.string().trim().catch(""),
   ADMIN_PASSWORD: z.string().catch(""),
 
@@ -74,7 +75,7 @@ function readEnv(env = process.env) {
   const nodeEnv = parsed.NODE_ENV || "development";
   const isProduction = nodeEnv === "production";
 
-  return {
+  const config = {
     nodeEnv,
     isProduction,
     port: parsed.PORT,
@@ -96,6 +97,11 @@ function readEnv(env = process.env) {
     },
     rateLimit: { max: parsed.RATE_LIMIT_MAX, windowMs: parsed.RATE_LIMIT_WINDOW_MS },
   };
+  Object.defineProperty(config.jwt, "cookieSameSite", {
+    value: parsed.COOKIE_SAME_SITE ?? (isProduction ? "none" : "lax"),
+    enumerable: false,
+  });
+  return config;
 }
 
 // What the server cannot start without. Both are deployment facts with no safe default: a silent
