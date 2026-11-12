@@ -90,6 +90,13 @@ verified against the code, with the file that causes it.
 - **No learning-outcome claim.** Nothing here has been compared against a plain chatbot, a
   tutor-prompted chatbot, NotebookLM, or a delayed post-test. There is no ethics approval and no
   frozen research build, so the beta cannot support a claim that students learn more.
+- **Degraded responses are not recorded, so the dashboard cannot count them.** `degraded: true`
+  goes to the client and is never stored, so `GET /admin/analytics/overview` reports
+  `degradedRate: { recorded: false, rate: null }`. Any number there would be made up.
+- **Analytics aggregates events, not understanding.** `outcomesByConcept` tallies all evidence in a
+  topic (mastered ≥60% correct over 2+ graded events, struggling = incorrect ≥ correct, else
+  emerging/unassessed). It is a cohort view of which concepts draw wrong answers, never a
+  per-student verdict — those stay in the derived learner model, and stay provisional.
 
 ## Deployment
 

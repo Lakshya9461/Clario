@@ -262,6 +262,36 @@ Res `200`: `{ "user": { id, name, email, role, createdAt } }`.
 Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request` (any other `role`),
 `400 cannot_change_own_role`, `404 user_not_found`.
 
+### GET /admin/analytics/overview
+The numbers behind the admin dashboard. Nothing is stored: every figure is derived per request from
+what is already in Mongo. Admin-only, like every `/admin/*` route.
+
+Req query: `topic?` (substring-free, spells a topic as its pack stores it; 1–120 characters). When
+omitted, the outcome table uses the topic with the most sessions.
+
+Res `200`:
+```
+{ "sessionsPerDay": [{ "date": "YYYY-MM-DD", "count": number }],   // exactly 30 UTC days, zero-filled, oldest first
+  "evidenceByQuality": [{ "quality": "code_keyed"|"llm_keyed"|"llm_graded"|"self_reported", "count": number }],  // every label present, zero-filled
+  "outcomesByConcept": {
+    "topic": string|null,
+    "topicSource": "given"|"most_sessions"|null,
+    "packAvailable": boolean,                                       // false when the pack is gone; concepts then come from the rows alone
+    "concepts": [{ "conceptId", "name", "status": "mastered"|"emerging"|"struggling"|"unassessed",
+                   "events": number, "outcomes": { "correct", "incorrect", "partial", "unsure" } }]
+  },
+  "topicsBySessions": [{ "topic": string, "sessions": number }],    // top 10, ranked by session count
+  "degradedRate": { "recorded": false, "rate": null } }
+```
+- `mastered`: at least 2 graded events (correct + incorrect) and at least 60% correct.
+  `struggling`: incorrect ≥ correct and at least one incorrect. `unassessed`: no events at all.
+  Everything else with events is `emerging`. Partial/unsure never make a concept `mastered`.
+- Degraded LLM replies are not recorded anywhere, so there is no rate: `recorded: false, rate: null`,
+  never a fabricated 0.
+
+Errors: `401 unauthorized`, `403 forbidden` (a student), `400 invalid_request`,
+`404 topic_not_available` (an explicit `topic` with no pack; the derived default degrades to `packAvailable: false` instead).
+
 ### GET /health
 Res `200`: `{ "status": "ok" }`. Used by the container healthcheck.
 

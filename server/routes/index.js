@@ -27,6 +27,7 @@ const model = require("../controllers/model");
 const sessions = require("../controllers/sessions");
 const adminPacks = require("../controllers/admin-packs");
 const adminUsers = require("../controllers/admin-users");
+const adminAnalytics = require("../controllers/admin-analytics");
 const auth = require("../controllers/auth");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
@@ -64,6 +65,7 @@ function userFilter({ q, role }) {
 }
 
 const byNewest = { createdAt: -1 };
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 const defaultDeps = {
   chatJson,
@@ -106,6 +108,46 @@ const defaultDeps = {
   countUsers: (query) => User.countDocuments(userFilter(query)),
   updateUserRole: (id, role) =>
     mongoose.isValidObjectId(id) ? User.findByIdAndUpdate(id, { role }, { new: true }).lean() : null,
+
+  // --- admin analytics (R5) -----------------------------------------------
+  // Real aggregation pipelines over the two collections that hold the facts. Nothing is stored:
+  // every number is derived per request. UTC days, like the client asks for, so a day means the same
+  // thing on both ends of the wire.
+  analyticsSessionsPerDay: () =>
+    Session.aggregate([
+      { $match: { createdAt: { $gte: new Date(Date.now() - THIRTY_DAYS_MS) } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: "UTC" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+  // evidenceQuality is null on self_report rows; the pipeline hands null through and the classifier
+  // names it. Grouping by the raw field beats grouping by a made-up placeholder.
+  analyticsEvidenceByQuality: () =>
+    EvidenceEvent.aggregate([{ $group: { _id: "$evidenceQuality", count: { $sum: 1 } } }]),
+  analyticsTopicsBySessions: () =>
+    Session.aggregate([
+      { $group: { _id: { $toLower: "$topic" }, topic: { $first: "$topic" }, sessions: { $sum: 1 } } },
+      { $sort: { sessions: -1, _id: 1 } },
+      { $limit: 10 },
+      { $project: { _id: 0, topic: 1, sessions: 1 } },
+    ]),
+  analyticsOutcomeCounts: async (topic) => {
+    // Same case-insensitive topic match as the session list.
+    const sessions = await Session.find({ topic: sameText(topic) }).select("_id").lean();
+    const ids = sessions.map((doc) => doc._id);
+    if (!ids.length) return [];
+    return EvidenceEvent.aggregate([
+      { $match: { sessionId: { $in: ids } } },
+      { $group: { _id: { conceptId: "$conceptId", outcome: "$outcome" }, count: { $sum: 1 } } },
+    ]);
+  },
+  // Degraded LLM replies are not recorded anywhere yet, so there is nothing to aggregate. Returning
+  // 0 would look like a measurement; returning null says "not instrumented".
+  analyticsDegradedRate: () => ({ recorded: false, rate: null }),
 };
 
 function createRouter(overrides = {}) {
@@ -185,6 +227,13 @@ function createRouter(overrides = {}) {
     adminOnly,
     validate(adminUsers.roleSchema),
     adminUsers.changeRole(deps)
+  );
+
+  router.get(
+    "/admin/analytics/overview",
+    adminOnly,
+    validate(adminAnalytics.overviewQuerySchema, { source: "query" }),
+    adminAnalytics.overview(deps)
   );
 
   router.use(studyRouter);
