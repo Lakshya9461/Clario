@@ -29,7 +29,7 @@ async function start() {
   }
 
   app.listen(config.port, () => {
-    console.log(`clario server listening on http://127.0.0.1:${config.port}`);
+    console.log(`clario server listening on port ${config.port}`);
   });
 }
 

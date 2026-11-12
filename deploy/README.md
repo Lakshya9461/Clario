@@ -53,3 +53,6 @@ port-8081 proxy and its HTTP checks could not be run here. Nginx itself was not 
 The actual `docker compose build` and `docker compose up -d` were not run
 because this environment's user cannot access the Docker daemon; run them once on the
 host with Docker access.
+
+For Atlas, Render/Railway, and Vercel/Netlify, plus health checks, admin seeding, and the Strata
+tunnel, see `docs/DEPLOY.md`.
