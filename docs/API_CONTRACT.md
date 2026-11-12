@@ -1,8 +1,9 @@
 # Clario beta: API contract and build rules
 
-Stack: React (Vite) client + Express/Mongoose/ zod server, one LLM behind `server/llm.js`
-(Strata, OpenAI-compatible). Text only, college students, no auth: the session id is a Mongo
-ObjectId kept in `localStorage` on the client.
+Stack: React (Vite) client + Express/Mongoose/zod server, one LLM behind `server/llm.js`
+(Strata, OpenAI-compatible). Text only, college students. Auth is required: a bcrypt password hash,
+a JWT in an httpOnly cookie, and the roles `student`/`admin`. Every session and its evidence belongs
+to one account; a session id is never enough to read it.
 
 Scope: **any** topic, but only topics whose pack already exists. A session runs on a curated
 JSON pack from `server/packs/` or on a pack an offline generation run stored in Mongo. **No
@@ -18,8 +19,9 @@ README (A1–A5), the amendment wins.
    `appendEvents()` in `routes.js` drops any event whose `conceptId` is not in the pack.
 2. Estimates are derived per request by `computeEstimate()` in `server/models/models.js` and are
    never stored.
-3. Evidence is append-only. There is no update or delete route; the only deletion path is the
-   operator-only `server/scripts/teardown.js`.
+3. Evidence is append-only. There is no update route; the only deletions are the owner deleting
+   the session the evidence belongs to (`DELETE /sessions/:id`, the owner's right to withdraw their
+   data) and the operator-only `server/scripts/teardown.js`.
 4. Student text goes into a prompt only through `server/data-tags.js` (`asData`/`attribute`), which
    neutralises the closing tag. Student *answers* are additionally capped at 4000 characters at
    the route boundary.
@@ -151,6 +153,115 @@ Res `200`:
 
 Errors: `404 session_not_found`, `404 topic_not_available`.
 
+### GET /sessions
+The caller's own sessions, newest first.
+
+Req query: `page?` (default 1), `limit?` (default 20, at most 50 — a larger value is a 400),
+`topic?` (exact match, case-insensitive), `q?` (substring match on the title, case-insensitive).
+An empty value means the filter is absent, not "match nothing".
+
+Res `200`: the list envelope `{ items, page, limit, total, totalPages }`, items of
+`SessionSummary = { id, title, topic, packId, packStatus, goal, answeredCount, createdAt }`.
+`title` falls back to the topic for sessions written before titles existed. `userId` is never sent.
+
+Errors: `401 unauthorized`, `400 invalid_request` (bad `page`/`limit`/`topic`/`q`).
+
+### GET /sessions/:id
+One session, owned by the caller (admins may read any).
+
+Res `200`: `{ "session": SessionSummary }`.
+
+Errors: `401 unauthorized`, `404 session_not_found` (unknown, malformed, or not yours).
+
+### PATCH /sessions/:id
+Rename a session. `title` must be 1–120 characters and is stored trimmed.
+
+Req: `{ "title": string }`
+Res `200`: `{ "session": SessionSummary }`.
+
+Errors: `401 unauthorized`, `400 invalid_request` (empty, over 120, or not an object),
+`404 session_not_found`.
+
+### DELETE /sessions/:id
+Delete a session and its evidence events. The owner's right to withdraw their data.
+
+Res `204` with no body.
+
+Errors: `401 unauthorized`, `404 session_not_found`.
+
+### GET /admin/packs
+Every stored pack — packs shipped in `server/packs/` are code and are not listed here.
+
+Req query: `page?`, `limit?`, `q?` (substring match on the topic), `status?` (`curated` | `generated`).
+
+Res `200`: the list envelope, items of `PackSummary = { id, packId, topic, topicKey, status, version,
+conceptCount, questionCount, reviewedBy, reviewedAt, createdAt }`. Answer keys are not in the list.
+
+Errors: `401 unauthorized`, `403 forbidden` (a student), `400 invalid_request`.
+
+### GET /admin/packs/:id
+One stored pack, whole JSON included (answer keys and all) — approving a pack is checking its keys,
+so the reviewer needs them.
+
+Res `200`: `{ "pack": PackSummary & { pack: <full pack JSON> } }`.
+
+Errors: `401 unauthorized`, `403 forbidden`, `404 pack_not_found`.
+
+### POST /admin/packs
+Import a pack JSON. The body must pass `validatePack` as a **generated** draft — `status` in the body
+is ignored, so a body cannot approve itself.
+
+Res `201`: `{ "pack": PackSummary }`.
+
+Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request`,
+`409 pack_exists` (a pack for that topic, or another pack using that `packId`),
+`422 pack_invalid` (`{ error, message, errors: string[] }` — the validator's reasons; nothing is stored).
+
+### PUT /admin/packs/:id
+Replace a stored pack. Re-validated as a draft, exactly like the import: `packId` cannot change,
+`topicKey` is recomputed, and **an earlier approval is cleared** (the reviewed bytes are gone).
+
+Res `200`: `{ "pack": PackSummary & { pack: <full pack JSON> } }`.
+
+Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request`, `404 pack_not_found`,
+`409 pack_exists`, `422 pack_invalid`.
+
+### POST /admin/packs/:id/approve
+The only route that makes a pack `curated`. `validatePack` runs again on the pack first, then
+`pack.status` becomes `curated`, and `reviewedBy`/`reviewedAt` are set to the admin's email and now.
+
+Res `200`: `{ "pack": PackSummary & { pack: <full pack JSON> } }`.
+
+Errors: `401 unauthorized`, `403 forbidden`, `404 pack_not_found`, `422 pack_invalid`
+(nothing is blessed).
+
+### DELETE /admin/packs/:id
+Delete a stored pack. Nothing else is deleted — sessions that already ran on it keep their history.
+
+Res `204` with no body.
+
+Errors: `401 unauthorized`, `403 forbidden`, `404 pack_not_found`.
+
+### GET /admin/users
+Every account, newest first.
+
+Req query: `page?`, `limit?`, `q?` (substring match on name or email), `role?` (`student` | `admin`).
+
+Res `200`: the list envelope, items of `{ id, name, email, role, createdAt }`. Keys hashed at rest
+are never returned.
+
+Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request`.
+
+### PATCH /admin/users/:id/role
+Change one account's role. The caller cannot change their own role
+(`400 cannot_change_own_role`); any other account may be switched between `student` and `admin`.
+
+Req: `{ "role": "student" | "admin" }`
+Res `200`: `{ "user": { id, name, email, role, createdAt } }`.
+
+Errors: `401 unauthorized`, `403 forbidden`, `400 invalid_request` (any other `role`),
+`400 cannot_change_own_role`, `404 user_not_found`.
+
 ### GET /health
 Res `200`: `{ "status": "ok" }`. Used by the container healthcheck.
 
@@ -160,6 +271,7 @@ Question = { id, kind: "mcq"|"predict_output"|"free_text", prompt, conceptIds: s
              difficulty: 1|2|3, transfer: boolean, requiresWhy: boolean,
              options?: string[], code?: string }
 TraceData = { code: string, steps: [{ stack: string[], output: string[], note: string }] }
+ListEnvelope = { items: T[], page: number, limit: number, total: number, totalPages: number }
 ```
 `publicQuestion()` in `engine/session.js` builds the client copy: it never includes `answerKey`,
 `rubric` or fallback feedback, so the answer never leaves the server. The pack's `selfReport` mark
@@ -178,10 +290,18 @@ order, so grading can never disagree with the screen.
 | 400 | `question_not_found` | `questionId` is not in that pack section |
 | 400 | `step_not_found` | `stepIndex` is not a step of this plan |
 | 400 | `source_text_not_supported` | any non-empty `sourceText` |
+| 400 | `invalid_request` | a malformed body, params, or query string (failed zod), or `role` other than `student`/`admin` |
+| 400 | `cannot_change_own_role` | an admin tried to change their own role |
+| 401 | `unauthorized` | no token, or an expired/invalid cookie |
+| 403 | `forbidden` | a student used an admin route |
 | 404 | `topic_not_available` | no bundled or stored pack for that topic, or the session's pack is gone |
 | 404 | `session_not_found` | unknown or malformed `sessionId` |
+| 404 | `pack_not_found` | no stored pack with that id (a bundled file is not addressable via this route) |
+| 404 | `user_not_found` | no user with that id |
 | 404 | `not_found` | no route for that method and path |
 | 409 | `question_already_answered` | the question was already claimed; nothing is graded twice |
+| 409 | `pack_exists` | the topic (or `packId`) is already taken by a stored pack |
+| 422 | `pack_invalid` | a pack failed `validatePack` on import, edit, or approve; `errors: string[]` says why |
 | 429 | `rate_limited` | more requests than the allowance in the window from one address (`RATE_LIMIT_MAX`, default 60 per minute); `Retry-After` says when to retry |
 | 503 | `busy` | LLM queue full (2 in flight, 3 waiting). Retry; this is not `degraded` |
 | 500 | `server_error` | anything else; the message is always "Something went wrong." |
@@ -197,5 +317,7 @@ returns usable fallback text written by the server plus `"degraded": true`. The 
 instead of pretending the model answered.
 
 ## Out of scope for the beta
-Accounts, cross-session history, spaced review, uploads, open-web search, generated diagrams,
-video, learner-profile editing or deletion, retention policy, a second curated pack.
+Password reset, email verification, admin bootstrap outside `scripts/seed-admin.js`,
+bundled-pack editing (a curated JSON file in the repository is read-only from the API by design),
+cross-session history beyond the list above, spaced review, uploads, open-web search, generated diagrams,
+video, learner-profile editing, retention policy, a second curated pack.

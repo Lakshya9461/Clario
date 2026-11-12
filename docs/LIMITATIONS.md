@@ -5,13 +5,26 @@ verified against the code, with the file that causes it.
 
 ## Content
 
-- **Generated packs are unreviewed.** A pack for a topic nobody curated is written by the model
-  (`server/packs/generate.js`) and stored as-is once it passes schema validation, graph checks and
-  the self-check. No human reads the questions or the answer keys. Curated packs live in
-  `server/packs/*.json` and there is one of them (`sample-topic-a.json`).
+- **Generated packs are unreviewed unless an admin approved them.** A pack for a topic nobody
+  curated is written by the model (`server/packs/generate.js`) and stored as-is once it passes schema
+  validation, graph checks and the self-check. No human reads the questions or the answer keys.
+  Curated packs live in `server/packs/*.json` and there is one of them (`sample-topic-a.json`).
+- **"Approved" means a person read the pack, not that the pack is verified.** `POST
+  /admin/packs/:id/approve` sets a stored pack to `status: "curated"`, records who did it and when
+  (`reviewedBy`, `reviewedAt`), and re-runs the schema validator first — a pack that no longer
+  validates cannot be approved. What that buys is a human having opened every question and checked
+  every answer key; it does **not** mean the content was fact-checked, piloted with students, or
+  assessed against a syllabus. It also does not regenerate anything: the approved pack is exactly the
+  bytes the model wrote. Editing it afterwards clears the approval, because the reviewed bytes are
+  gone.
+- **An approval does not upgrade evidence that came before it.** A session records the pack status it
+  started on (`Session.packStatus`), so answers graded while a pack was a draft stay `llm_keyed` and a
+  concept can reach at most `likely demonstrated` for that session, even after the same pack is
+  approved (`engine/session.js:provenanceFor`). Start a new session to practise on the approved keys.
 - **A generated pack's answer keys are the model's own.** They are graded in code, exactly, but
   the key itself came from the model, so `evidenceQuality` is `llm_keyed`, never `code_keyed`
-  (`engine/grading.js:keyedQuality`).
+  (`engine/grading.js:keyedQuality`) — unless an admin approved the pack and the session started
+  after that.
 - **The self-check is the model grading itself.** Surviving questions are ones the same model
   answered consistently (`packs/generate.js`, `SELF_CHECK_*`). "0 dropped" means the model agreed
   with itself, not that the questions are right. Questions about a real course topic still need a
@@ -45,13 +58,18 @@ verified against the code, with the file that causes it.
 
 ## Operations and safety
 
-- **No accounts and no retention policy.** A session id is a Mongo ObjectId in `localStorage`;
-  anyone with the id can read the session. Data is kept until an operator deletes it with
-  `server/scripts/teardown.js`. There is no user-facing deletion, no cross-session history, and no
-  policy for minors — a first-year may be 17, so this must be resolved before any real use.
-- **What is stored:** the topic, the goal text (40 characters max), which questions were answered,
-  and one evidence event per concept per answer (with a short note). Not stored: names, emails,
-  IPs, or the answer text itself.
+- **Accounts, and what they do not solve.** Auth is required: bcrypt password hashes, a JWT in an
+  httpOnly cookie, and the roles `student`/`admin` (`controllers/auth.js`, `middleware/auth.js`).
+  A student can read and delete only their own sessions; an admin can read any, and can change
+  another account's role but not their own. There is still no password reset, no email verification,
+  no session-expiry UI, and no retention policy beyond "the owner can delete a session, which deletes
+  its evidence too" (`DELETE /sessions/:id`) and the operator teardown
+  (`server/scripts/teardown.js`). No policy for minors — a first-year may be 17, so this must be
+  resolved before any real use.
+- **What is stored:** for an account, the name, email, bcrypt hash, role and creation time; for a
+  session, the topic, the title, the goal text (40 characters max), which questions were answered;
+  and one evidence event per concept per answer (with a short note). Not stored: IPs, or the answer
+  text itself.
 - **The only rate limit is one crude per-address window.** 60 requests a minute per address by
   default (`RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS` raise or widen it for a room where several
   people share one address), over the whole API, swept in memory (`server/rate-limit.js`); past it
