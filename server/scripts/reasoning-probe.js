@@ -4,7 +4,7 @@
 // Uses real self-check questions from a stored pack so answers are checkable.
 require("dotenv").config();
 
-const db = require("../db");
+const db = require("../config/db");
 const { Pack } = require("../models/models");
 const { chatJson } = require("../llm");
 const { prompts, selfCheckResponseSchema } = require("../packs/generate");

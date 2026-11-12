@@ -12,7 +12,7 @@ const dotenv = require("dotenv");
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
-const db = require("../db");
+const db = require("../config/db");
 const { Pack, EvidenceEvent, computeEstimate } = require("../models/models");
 const { loadBundledPacks } = require("../packs/loader");
 const { normalizeTopic } = require("../packs/topic");

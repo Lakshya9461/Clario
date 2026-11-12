@@ -15,7 +15,7 @@
 
 require("dotenv").config();
 
-const db = require("../db");
+const db = require("../config/db");
 const { chatJson } = require("../llm");
 const { Pack } = require("../models/models");
 const {

@@ -16,7 +16,7 @@
 
 require("dotenv").config();
 
-const db = require("../db");
+const db = require("../config/db");
 const { chatJson } = require("../llm");
 const { topicSupported, topicCheckResponseSchema, TOPIC_CHECK_MAX_TOKENS, prompts } = require("../packs/generate");
 

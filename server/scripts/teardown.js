@@ -15,7 +15,7 @@
 
 require("dotenv").config();
 
-const { connect, disconnect, mongoUrl, redactUrl } = require("../db");
+const { connect, disconnect, mongoUrl, redactUrl } = require("../config/db");
 const { Session, EvidenceEvent, Pack } = require("../models/models");
 
 const DELETE_FLAGS = new Set(["--yes", "--force"]);

@@ -1,12 +1,13 @@
 // The one place that opens the MongoDB connection. Used by the server bootstrap and by the
-// preview script, so both use the same policy instead of each inventing one.
+// preview/benchmark scripts, so both use the same policy instead of each inventing one.
 //
-// Nothing here knows about topics, students or packs: it connects, reports why it could not,
-// and redacts the password before a connection string reaches a log.
+// Nothing here knows about topics, students or packs: it connects, reports why it could not, and
+// redacts the password before a connection string reaches a log. The URL itself comes from
+// config/env.js, so `MONGO_URL` is read in one place.
 
 const mongoose = require("mongoose");
+const { readEnv, DEFAULT_MONGO_URL } = require("./env");
 
-const DEFAULT_MONGO_URL = "mongodb://127.0.0.1:27017/clario";
 // Fail at startup rather than letting every request sit in mongoose's 10s buffer and come back
 // as a vague timeout.
 const SERVER_SELECTION_TIMEOUT_MS = 15_000;
@@ -19,8 +20,10 @@ function redactUrl(url) {
   return String(url ?? "").replace(/(\/\/[^:/@]+):[^/]*@/, "$1:<redacted>@");
 }
 
-function mongoUrl() {
-  return process.env.MONGO_URL || DEFAULT_MONGO_URL;
+// Parsed per call, not cached at import: a script or a test that sets MONGO_URL after requiring
+// this module must still get the value it set.
+function mongoUrl(env = process.env) {
+  return readEnv(env).mongoUrl;
 }
 
 async function connect(url = mongoUrl()) {

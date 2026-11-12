@@ -1,4 +1,4 @@
-// redactUrl is the only part of db.js that can be tested without a database: it is also the
+// redactUrl is the only part of config/db.js that can be tested without a database: it is also the
 // part that must never get a password wrong, because its output goes to logs.
 const { test } = require("node:test");
 const assert = require("node:assert/strict");

@@ -6,7 +6,7 @@
 const fs = require("node:fs");
 require("dotenv").config();
 
-const db = require("../db");
+const db = require("../config/db");
 const { Pack } = require("../models/models");
 const { validatePack } = require("../packs/loader");
 const { normalizeTopic } = require("../packs/generate");

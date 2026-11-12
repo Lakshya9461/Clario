@@ -11,7 +11,7 @@
 
 require("dotenv").config();
 
-const db = require("../db");
+const db = require("../config/db");
 const { generatePack, normalizeTopic } = require("../packs/generate");
 const { validatePack } = require("../packs/loader");
 const { Pack } = require("../models/models");

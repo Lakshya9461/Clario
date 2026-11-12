@@ -3,15 +3,21 @@
 // a zod schema and a fallback. Rule 2: on invalid output retry once, then fall back and
 // report "degraded". Rule 9: prompts and answers are never logged.
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:8080/v1";
+const { readEnv, DEFAULT_LLM_TIMEOUT_MS } = require("./config/env");
+
 // Generation asks for ~2k tokens of JSON, which a slow model can take well over a minute to
 // produce. A local default keeps the beta responsive; LLM_TIMEOUT_MS raises it for a model that
 // needs longer without changing any call site.
-const DEFAULT_TIMEOUT_MS = 90_000;
+const DEFAULT_TIMEOUT_MS = DEFAULT_LLM_TIMEOUT_MS;
+
+// Settings are read per call, not cached at import, so a test or a script that changes the
+// environment after requiring this module still gets what it set.
+function llmConfig() {
+  return readEnv().llm;
+}
 
 function timeoutFromEnv() {
-  const value = Number(process.env.LLM_TIMEOUT_MS);
-  return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
+  return llmConfig().timeoutMs;
 }
 const TEMPERATURE = 0.3;
 
@@ -84,7 +90,7 @@ function withQueue(task) {
 }
 
 function requireModel() {
-  const model = process.env.LLM_MODEL;
+  const model = llmConfig().model;
   if (!model) throw new LlmError("LLM_MODEL is not configured.");
   return model;
 }
@@ -162,8 +168,8 @@ async function chat(messages, options = {}) {
 
   return withQueue(async () => {
     const model = requireModel();
-    const baseUrl = (process.env.LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
-    const apiKey = process.env.LLM_API_KEY;
+    const { baseUrl: configuredBaseUrl, apiKey } = llmConfig();
+    const baseUrl = configuredBaseUrl.replace(/\/+$/, "");
 
     // Streaming is what makes a slow model usable: a proxy in front of the LLM (Cloudflare, for
     // one) gives up on a request with no bytes after ~100s, but keeps a stream open. The server

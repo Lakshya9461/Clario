@@ -2,10 +2,12 @@
 
 const express = require("express");
 const cors = require("cors");
+const { readEnv } = require("./config/env");
 const { toHttpError } = require("./errors");
 const { createRouter } = require("./routes");
 const { rateLimit, limitFromEnv } = require("./rate-limit");
 
+const config = readEnv();
 const app = express();
 
 // The deployment publishes the proxy and nothing else, and the proxy sets X-Forwarded-For, so
@@ -22,7 +24,7 @@ app.get("/health", (req, res) => {
 // CORS first among the limited routes, so a 429 still carries the headers the browser needs in
 // order to read it, then the limiter before the body is parsed, so a rejected request costs
 // nothing.
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
+app.use(cors({ origin: config.clientOrigin }));
 app.use(rateLimit(limitFromEnv()));
 app.use(express.json({ limit: "1mb" }));
 
