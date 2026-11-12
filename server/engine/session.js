@@ -149,7 +149,14 @@ async function listTopics(deps = {}) {
 
   for (const pack of bundled.filter((entry) => entry.status === "curated")) add(pack, "curated", true);
   for (const pack of bundled.filter((entry) => entry.status !== "curated")) add(pack, "generated", true);
-  for (const entry of stored) if (entry?.pack) add(entry.pack, "generated", false);
+  // A stored pack is a draft unless an admin approved it. Approval is a person reading every answer
+  // key, which is exactly what makes a stored pack curated — so it is reported the same way a pack
+  // written by hand is, because as far as the student is concerned it was checked the same way.
+  for (const entry of stored) {
+    if (!entry?.pack) continue;
+    const curated = entry.pack.status === "curated";
+    add(entry.pack, curated ? "curated" : "generated", curated);
+  }
 
   return topics;
 }
@@ -175,10 +182,13 @@ async function packForSession(session, deps = {}) {
   );
 }
 
-async function createSession({ topic, goal = "", deps = {} } = {}) {
+async function createSession({ topic, goal = "", userId, deps = {} } = {}) {
   const pack = await resolvePack(topic, deps);
   const create = deps.createSession || ((doc) => Session.create(doc));
   const session = await create({
+    ...(userId ? { userId } : {}),
+    // A new session is named after the topic it is about; the student renames it from the list.
+    title: pack.topic,
     topic: pack.topic,
     packId: pack.packId,
     packStatus: pack.status,
@@ -187,20 +197,38 @@ async function createSession({ topic, goal = "", deps = {} } = {}) {
   return { session, pack };
 }
 
-async function loadSession({ sessionId, deps = {} } = {}) {
+// A4 hangs off the pack a session STARTED on, not off the pack as it is today. An admin can approve a
+// stored pack while sessions are running on it; the keys that graded those answers were the model's,
+// and the evidence must keep saying so. Every grading, estimate and plan path reads the pack it is
+// handed, so this is the one place that pins the provenance and all of them inherit it.
+function provenanceFor(session, pack) {
+  const status = session?.packStatus || pack.status;
+  return status === pack.status ? pack : { ...pack, status };
+}
+
+async function loadSession({ sessionId, userId, isAdmin = false, withPack = true, deps = {} } = {}) {
   if (typeof sessionId !== "string" || !mongoose.isValidObjectId(sessionId)) {
     throw new SessionNotFoundError();
   }
-  const find = deps.findSession || ((id) => Session.findById(id).lean());
+  const find =
+    deps.findSession ||
+    ((id, owner) =>
+      Session.findOne({
+        _id: id,
+        ...(owner && !isAdmin ? { userId: owner } : {}),
+      }).lean());
   let session;
   try {
-    session = await find(sessionId);
+    session = await find(sessionId, userId);
   } catch {
     throw new SessionNotFoundError(); // a malformed id inside a valid shape
   }
   if (!session) throw new SessionNotFoundError();
+  // Renaming or deleting a session does not need its pack, and must still work when the pack is gone:
+  // a student can always take their own data away.
+  if (!withPack) return { session };
   const pack = await packForSession(session, deps);
-  return { session, pack };
+  return { session, pack: provenanceFor(session, pack) };
 }
 
 // Claims the right to grade one answer. Returns false when the question was already claimed,
@@ -338,6 +366,7 @@ module.exports = {
   resolvePack,
   listTopics,
   packForSession,
+  provenanceFor,
   createSession,
   loadSession,
   claimQuestion,

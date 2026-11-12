@@ -15,6 +15,14 @@ class InvalidTopicError extends Error {
   }
 }
 
+// The store's cache key for a topic: the same string normalizeTopic() would return, lowercased, or
+// "" when there is nothing usable. Non-throwing on purpose — a pack's own topic is stored data, so a
+// bad one belongs in a pack-validation message, not in an invalid_topic refusal to a student.
+function topicKey(topic) {
+  if (typeof topic !== "string") return "";
+  return topic.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 // Throws InvalidTopicError, or returns the topic with outer spaces and runs of whitespace
 // collapsed. The cache key is this value lowercased.
 function normalizeTopic(topic) {
@@ -27,4 +35,5 @@ function normalizeTopic(topic) {
   return collapsed;
 }
 
-module.exports = { MAX_TOPIC_LENGTH, InvalidTopicError, normalizeTopic };
+module.exports = { MAX_TOPIC_LENGTH, InvalidTopicError, normalizeTopic, topicKey };
+

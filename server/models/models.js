@@ -1,13 +1,21 @@
 // Mongoose models and the derived-estimate function for the Clario beta.
 // Rules:
-//  - evidenceEvents are APPEND-ONLY. Never update or delete them (except tester-data teardown).
+//  - evidenceEvents are APPEND-ONLY. Never update them. The one deletion path is the owner deleting
+//    the session they belong to (their right to withdraw their data), or the operator teardown.
 //  - The per-concept estimate is DERIVED by computeEstimate(); it is never stored.
 //  - The LLM may only PROPOSE evidence events (validated by the server); it never writes an estimate.
 //  - This file holds NO topic content. Topics live in packs (server/packs/).
 
 const mongoose = require("mongoose");
 
+// Long enough for a sentence about what the session is for, short enough to list one per row.
+const MAX_TITLE_LENGTH = 120;
+
 const sessionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true, required: true },
+  // The student's own name for the session. Empty on rows created before titles existed, which read
+  // as their topic instead.
+  title: { type: String, default: "", trim: true, maxlength: MAX_TITLE_LENGTH },
   // The student's topic as entered. Matched case-insensitively against pack.topic.
   topic: { type: String, required: true },
   // The pack this session is running on, and where it came from. packStatus is stored
@@ -46,8 +54,9 @@ const evidenceEventSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-// A1: generated draft packs. Curated packs are JSON files in server/packs/ and never live
-// here. The whole pack is stored as validated JSON; topicKey is the cache key, so asking
+// A1: draft packs. Curated packs are JSON files in server/packs/ and never live here — unless an
+// admin approved a stored one, which is the only way a stored pack becomes curated.
+// The whole pack is stored as validated JSON; topicKey is the cache key, so asking
 // for the same topic twice reuses one pack instead of regenerating it.
 // minimize: false, because mongoose's default strips empty objects out of the Mixed pack on
 // save. "traces" is required by the validator and is {} for every generated pack, so the default
@@ -56,7 +65,13 @@ const packSchema = new mongoose.Schema(
   {
     topicKey: { type: String, required: true, unique: true }, // normalized topic: trimmed, collapsed, lowercase
     topic: { type: String, required: true },                  // the topic as the student asked for it
-    pack: { type: mongoose.Schema.Types.Mixed, required: true }, // validated pack JSON, status "generated"
+    // Validated pack JSON. Its own `status` follows the review: "generated" until an admin approves
+    // it, "curated" after. Only the approve route writes that field; import and edit force a draft.
+    pack: { type: mongoose.Schema.Types.Mixed, required: true },
+    // Who read the pack and checked every answer key, and when. Empty until then; cleared again by an
+    // edit, because the bytes that were reviewed are gone.
+    reviewedBy: { type: String, default: null },
+    reviewedAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },
   },
   { minimize: false }
@@ -135,6 +150,7 @@ function computeEstimate(events, concepts = [], packStatus = "curated") {
 }
 
 module.exports = {
+  MAX_TITLE_LENGTH,
   Session: mongoose.model("Session", sessionSchema),
   EvidenceEvent: mongoose.model("EvidenceEvent", evidenceEventSchema),
   Pack: mongoose.model("Pack", packSchema),

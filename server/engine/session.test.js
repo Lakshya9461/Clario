@@ -232,7 +232,43 @@ test("creating a session copies the pack's own topic, id and status", async () =
   assert.equal(stored.topic, pack.topic, "the pack's spelling is stored, not the student's");
   assert.equal(stored.packId, "generated-3");
   assert.equal(stored.packStatus, "generated");
+  assert.equal(stored.title, pack.topic, "a new session is named after the pack it runs on");
   assert.equal(session.goal, "exam");
+});
+
+test("an approved stored pack is offered as curated, because a person checked every key", async () => {
+  const approved = makePack({ topic: "Approved Topic", status: "curated", packId: "approved-1" });
+  const drafted = makePack({ topic: "Draft Topic", status: "generated", packId: "draft-1" });
+
+  const topics = await listTopics({
+    bundledPacks: () => [],
+    listStored: async () => [{ pack: drafted }, { pack: approved }],
+  });
+
+  assert.deepEqual(topics, [
+    { topic: "Draft Topic", source: "generated", reviewed: false },
+    // Only an admin's approval changes this store's answer, and it makes the pack curated.
+    { topic: "Approved Topic", source: "curated", reviewed: true },
+  ]);
+});
+
+// A4 hangs off the pack a session STARTED on. Approving a stored pack while sessions are running on
+// it must not rewrite what the old keys were worth.
+test("a session keeps the pack status it started on after the stored pack is approved", async () => {
+  const nowCurated = makePack({ status: "curated", packId: "promoted-1", topic: "Promoted Topic" });
+  const session = makeSession(nowCurated, { packStatus: "generated" });
+
+  const loaded = await loadSession({
+    sessionId: String(session._id),
+    deps: {
+      findSession: async () => session,
+      findStored: async () => ({ pack: nowCurated }),
+    },
+  });
+
+  assert.equal(loaded.pack.status, "generated", "the evidence was graded by the model's keys");
+  assert.equal(loaded.pack.packId, "promoted-1", "the same pack, wearing its start-time status");
+  assert.equal(nowCurated.status, "curated", "the stored pack itself was not modified");
 });
 
 test("claiming an answer twice reports the second claim as taken", async () => {
