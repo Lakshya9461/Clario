@@ -202,7 +202,7 @@ function createRouter(overrides = {}) {
   router.delete("/sessions/:id", signedIn, sessions.remove(deps));
 
   // --- the admin shelf ----------------------------------------------------
-  const adminOnly = [signedIn, requireRole("admin")];
+  const adminOnly = [signedIn, requireRole("admin", { findUserById: deps.findUserById })];
 
   router.get(
     "/admin/packs",

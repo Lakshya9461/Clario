@@ -33,9 +33,29 @@ function requireAuth(options = {}) {
   };
 }
 
-function requireRole(role) {
-  return (req, res, next) => {
-    if (!req.user || req.user.role !== role) return next(new ForbiddenError());
+function requireRole(role, options = {}) {
+  const findUserById = options.findUserById;
+  return async (req, res, next) => {
+    if (!req.user) return next(new ForbiddenError());
+
+    // If a database lookup function is provided, re-verify caller still exists and still holds role
+    if (typeof findUserById === "function") {
+      try {
+        const user = await findUserById(req.user.sub);
+        if (!user) {
+          return next(new AuthRequiredError());
+        }
+        if (user.role !== role) {
+          return next(new ForbiddenError());
+        }
+        req.account = user;
+        return next();
+      } catch (err) {
+        return next(err);
+      }
+    }
+
+    if (req.user.role !== role) return next(new ForbiddenError());
     return next();
   };
 }

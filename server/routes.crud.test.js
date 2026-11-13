@@ -194,6 +194,7 @@ function storeDeps(store) {
         .sort(newestFirst)
         .slice(query.skip, query.skip + query.limit),
     countUsers: async (query) => users.filter((doc) => userMatches(doc, query)).length,
+    findUserById: async (userId) => users.find((user) => sameId(user._id, userId)) || null,
     updateUserRole: async (userId, role) => {
       const doc = users.find((user) => sameId(user._id, userId));
       if (!doc) return null;

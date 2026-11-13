@@ -8,7 +8,7 @@ const loginSchema = z.object({
   password: z.string().min(1).max(200),
 });
 const GENERIC_LOGIN_MESSAGE = "Invalid email or password.";
-const DUMMY_HASH = "$2b$12$C6UzMDM.H6dfI/f/IKcEe.8q9q8q9q8q9q8q9q8q9q8q9q8q9q8q";
+const DUMMY_HASH = bcrypt.hashSync("dummy", 12);
 
 class AuthInputError extends Error {
   constructor() {
@@ -103,4 +103,5 @@ module.exports = {
   DuplicateEmailError,
   GENERIC_LOGIN_MESSAGE,
   cookieOptions,
+  DUMMY_HASH,
 };

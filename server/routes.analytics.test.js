@@ -135,6 +135,7 @@ async function setup({ bundled = [], events = [] } = {}) {
     findStored: async (topicKey) => store.packs.find((doc) => doc.topicKey === topicKey) || null,
     findSession: async (sessionId) =>
       store.sessions.find((session) => sameId(session._id, sessionId)) || null,
+    findUserById: async (userId) => store.users.find((user) => sameId(user._id, userId)) || null,
     ...analyticsDeps(store),
   });
 
