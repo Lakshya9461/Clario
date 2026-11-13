@@ -884,6 +884,13 @@ test("approving a pack does not upgrade evidence already recorded on it", async 
     assert.equal(first.status, 200);
     app.store.packs[0].pack = { ...app.store.packs[0].pack, status: "curated" };
 
+    const middle = await app.post(
+      "/check",
+      { sessionId: String(session._id), questionId: "c2", answer: "It names the idea.", why: "because it says what the idea does" },
+      { token: app.asStudent }
+    );
+    assert.equal(middle.status, 200);
+
     const second = await app.post(
       "/check",
       { sessionId: String(session._id), questionId: "c3", answer: "option b" },
@@ -891,7 +898,7 @@ test("approving a pack does not upgrade evidence already recorded on it", async 
     );
     assert.equal(second.status, 200);
 
-    assert.equal(app.store.events.length, 2);
+    assert.equal(app.store.events.length, 3);
     for (const event of app.store.events) {
       assert.equal(event.evidenceQuality, "llm_keyed", "the session's own pack status graded it");
     }
