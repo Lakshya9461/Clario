@@ -166,3 +166,17 @@ test("finds a curated pack by topic, case-insensitively", () => {
   assert.equal(findPackByTopic(`  ${pack.topic}  `, packs), pack);
   assert.equal(findPackByTopic("no such topic", packs), null);
 });
+
+test("topics with runs of whitespace resolve like their single-space form", () => {
+  const pack = { ...loadBundledPacks().packs[0], topic: "Photosynthesis  Basics" };
+  const packs = [pack];
+  // Any mix of tabs, newlines and repeated spaces, in either the query or the pack's own topic.
+  assert.equal(findPackByTopic("Photosynthesis Basics", packs), pack);
+  assert.equal(findPackByTopic("photosynthesis\tbasics", packs), pack);
+  assert.equal(findPackByTopic("  Photosynthesis\n Basics  ", packs), pack);
+  assert.equal(findPackByTopic("Photosynthesis     Basics", packs), pack);
+  // A pack stored with irregular whitespace is found by the clean spelling.
+  const irregular = { ...loadBundledPacks().packs[0], topic: "Binary\t\t  Search" };
+  assert.equal(findPackByTopic("Binary Search", [irregular]), irregular);
+  assert.equal(findPackByTopic("binary   search", [irregular]), irregular);
+});

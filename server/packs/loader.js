@@ -9,6 +9,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { z } = require("zod");
+const { topicKey } = require("./topic");
 
 const PACKS_DIR = __dirname;
 
@@ -240,9 +241,10 @@ function loadBundledPacks(dir = PACKS_DIR) {
 // A3: match the student's topic against a curated pack, case-insensitively.
 function findPackByTopic(topic, packs) {
   if (typeof topic !== "string") return null;
-  const wanted = topic.trim().toLowerCase();
+  // Same key the store uses: runs of whitespace are not distinct topics.
+  const wanted = topicKey(topic);
   if (!wanted) return null;
-  return packs.find((pack) => pack.topic.trim().toLowerCase() === wanted) || null;
+  return packs.find((pack) => topicKey(pack.topic) === wanted) || null;
 }
 
 module.exports = {
